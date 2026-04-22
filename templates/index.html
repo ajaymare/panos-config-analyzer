@@ -93,26 +93,61 @@ function switchTab(tab) {
     }
 }
 
-// Show selected file names
-document.getElementById('file-input').addEventListener('change', function() {
+// Managed file list — allows removing individual files
+var selectedFiles = [];
+
+function renderFileList() {
     var list = document.getElementById('file-list');
     list.innerHTML = '';
-    var files = this.files;
-    if (files.length === 0) return;
-    for (var i = 0; i < files.length; i++) {
+    for (var i = 0; i < selectedFiles.length; i++) {
         var div = document.createElement('div');
         div.className = 'file-item';
-        var size = (files[i].size / 1024).toFixed(1);
-        div.textContent = files[i].name + ' (' + size + ' KB)';
+        var size = (selectedFiles[i].size / 1024).toFixed(1);
+        var span = document.createElement('span');
+        span.textContent = selectedFiles[i].name + ' (' + size + ' KB)';
+        div.appendChild(span);
+        var removeBtn = document.createElement('button');
+        removeBtn.className = 'file-remove';
+        removeBtn.textContent = '\u00d7';
+        removeBtn.setAttribute('data-index', i);
+        removeBtn.onclick = function(e) {
+            e.preventDefault();
+            var idx = parseInt(this.getAttribute('data-index'));
+            selectedFiles.splice(idx, 1);
+            syncFilesToInput();
+            renderFileList();
+        };
+        div.appendChild(removeBtn);
         list.appendChild(div);
     }
-    // Update button text
     var btn = document.getElementById('upload-btn');
-    if (files.length > 1) {
-        btn.textContent = 'Compare ' + files.length + ' Configurations';
+    if (selectedFiles.length > 1) {
+        btn.textContent = 'Compare ' + selectedFiles.length + ' Configurations';
     } else {
         btn.textContent = 'Parse Configuration';
     }
+}
+
+function syncFilesToInput() {
+    var dt = new DataTransfer();
+    for (var i = 0; i < selectedFiles.length; i++) {
+        dt.items.add(selectedFiles[i]);
+    }
+    document.getElementById('file-input').files = dt.files;
+}
+
+document.getElementById('file-input').addEventListener('change', function() {
+    var files = this.files;
+    for (var i = 0; i < files.length; i++) {
+        // Avoid duplicates by name
+        var exists = false;
+        for (var j = 0; j < selectedFiles.length; j++) {
+            if (selectedFiles[j].name === files[i].name) { exists = true; break; }
+        }
+        if (!exists) selectedFiles.push(files[i]);
+    }
+    syncFilesToInput();
+    renderFileList();
 });
 
 document.querySelectorAll('form').forEach(function(form) {

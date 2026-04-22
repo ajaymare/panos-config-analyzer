@@ -105,8 +105,13 @@ body {
 .file-item {
     padding: 6px 10px; font-size: 12px; color: var(--text-primary);
     background: #f5f7fa; border: 1px solid var(--border); border-radius: 4px;
-    margin-bottom: 4px;
+    margin-bottom: 4px; display: flex; justify-content: space-between; align-items: center;
 }
+.file-remove {
+    background: none; border: none; color: var(--danger); font-size: 16px;
+    cursor: pointer; padding: 0 4px; line-height: 1; font-weight: bold;
+}
+.file-remove:hover { color: #a71d2a; }
 
 .footer {
     text-align: center; padding: 16px; font-size: 11px; color: var(--text-secondary);
