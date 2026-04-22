@@ -31,9 +31,14 @@ PAN-OS SD-WAN Configuration Parser — a Docker-based Flask tool that parses Pal
 # Build and push (amd64)
 docker buildx build --platform linux/amd64 -t ajaymare/panos-config-analyzer:latest -f Dockerfile . --push
 
-# Run locally
-docker run -d --name panos-parser -p 8080:8080 ajaymare/panos-config-analyzer:latest
+# Run locally (HTTP 8080 + HTTPS 9443)
+docker run -d --name panos-parser -p 8080:8080 -p 9443:9443 ajaymare/panos-config-analyzer:latest
 ```
+
+### HTTPS
+- nginx reverse proxy on port 9443 with self-signed certificate (auto-generated on first start)
+- gunicorn listens on 127.0.0.1:8080 internally, nginx proxies HTTPS → gunicorn
+- Config: `nginx.conf`, entrypoint: `start.sh`
 
 ## Development Notes
 

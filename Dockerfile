@@ -1,5 +1,9 @@
 FROM python:3.12-slim
 
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    nginx openssl \
+    && rm -rf /var/lib/apt/lists/*
+
 WORKDIR /app
 
 COPY requirements.txt .
@@ -9,6 +13,10 @@ COPY . .
 
 RUN mkdir -p /tmp/reports
 
-EXPOSE 8080
+COPY nginx.conf /etc/nginx/conf.d/default.conf
+COPY start.sh /start.sh
+RUN chmod +x /start.sh
 
-CMD ["gunicorn", "-w", "2", "--threads", "4", "-b", "0.0.0.0:8080", "app:app"]
+EXPOSE 8080 9443
+
+CMD ["/start.sh"]

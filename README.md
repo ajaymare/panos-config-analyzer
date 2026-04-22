@@ -9,6 +9,7 @@ Docker-based tool with a Flask web UI that parses Palo Alto Panorama/NGFW config
 - **Panorama + NGFW**: Automatically detects config type, enumerates templates, template-stacks, and device-groups
 - **14 SD-WAN Feature Parsers**: Comprehensive extraction of all SD-WAN related configuration
 - **Excel Reports**: Quick Reference summary, detailed per-feature sheets, and comparison views
+- **HTTPS Support**: Self-signed certificate with nginx reverse proxy on port 9443
 - **Dockerized**: Single container, no external dependencies
 
 ## SD-WAN Features Parsed
@@ -35,16 +36,16 @@ Docker-based tool with a Flask web UI that parses Palo Alto Panorama/NGFW config
 ### Docker Run
 
 ```bash
-docker run -d --name panos-parser -p 8080:8080 ajaymare/panos-config-analyzer:latest
+docker run -d --name panos-parser -p 8080:8080 -p 9443:9443 ajaymare/panos-config-analyzer:latest
 ```
 
-Open `http://localhost:8080` in your browser.
+Open `http://localhost:8080` (HTTP) or `https://localhost:9443` (HTTPS) in your browser.
 
 ### Docker Build
 
 ```bash
 docker build -t ajaymare/panos-config-analyzer:latest .
-docker run -d --name panos-parser -p 8080:8080 ajaymare/panos-config-analyzer:latest
+docker run -d --name panos-parser -p 8080:8080 -p 9443:9443 ajaymare/panos-config-analyzer:latest
 ```
 
 ## Usage
@@ -96,6 +97,8 @@ parser/
 ├── config.py               # App configuration
 ├── requirements.txt        # Python dependencies
 ├── Dockerfile
+├── nginx.conf              # HTTPS reverse proxy config (port 9443)
+├── start.sh                # Entrypoint: generates self-signed cert, starts gunicorn + nginx
 ├── parsers/                # Feature extraction modules
 │   ├── base.py             # BaseParser ABC + FeatureResult
 │   ├── config_detector.py  # Panorama vs NGFW detection
@@ -119,3 +122,4 @@ parser/
 - pan-os-python — PAN-OS API connectivity
 - lxml — XML parsing
 - gunicorn — Production WSGI server
+- nginx — HTTPS reverse proxy with self-signed certificate
