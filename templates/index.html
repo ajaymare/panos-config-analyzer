@@ -107,6 +107,7 @@ function renderFileList() {
         span.textContent = selectedFiles[i].name + ' (' + size + ' KB)';
         div.appendChild(span);
         var removeBtn = document.createElement('button');
+        removeBtn.type = 'button';
         removeBtn.className = 'file-remove';
         removeBtn.textContent = '\u00d7';
         removeBtn.setAttribute('data-index', i);
@@ -150,15 +151,30 @@ document.getElementById('file-input').addEventListener('change', function() {
     renderFileList();
 });
 
+function resetUI() {
+    document.getElementById('spinner').classList.remove('active');
+    var uploadBtn = document.getElementById('upload-btn');
+    var apiBtn = document.getElementById('api-btn');
+    uploadBtn.disabled = false;
+    apiBtn.disabled = false;
+    if (selectedFiles.length > 1) {
+        uploadBtn.textContent = 'Compare ' + selectedFiles.length + ' Configurations';
+    } else {
+        uploadBtn.textContent = 'Parse Configuration';
+    }
+    apiBtn.textContent = 'Connect & Parse';
+}
+
 document.querySelectorAll('form').forEach(function(form) {
     form.addEventListener('submit', function(e) {
         e.preventDefault();
-        var spinner = document.getElementById('spinner');
-        var btns = form.querySelectorAll('button');
-        spinner.classList.add('active');
-        btns.forEach(function(b) { b.disabled = true; b.textContent = 'Processing...'; });
+        document.getElementById('spinner').classList.add('active');
+        var submitBtn = form.querySelector('button[type="submit"]');
+        if (submitBtn) { submitBtn.disabled = true; submitBtn.textContent = 'Processing...'; }
 
+        // Build FormData manually to ensure files are included
         var formData = new FormData(form);
+
         fetch('/parse', { method: 'POST', body: formData })
             .then(function(resp) {
                 if (!resp.ok) {
@@ -181,16 +197,10 @@ document.querySelectorAll('form').forEach(function(form) {
                 a.click();
                 a.remove();
                 URL.revokeObjectURL(url);
-                spinner.classList.remove('active');
-                btns.forEach(function(b) { b.disabled = false; });
-                document.getElementById('upload-btn').textContent = 'Parse Configuration';
-                document.getElementById('api-btn').textContent = 'Connect & Parse';
+                resetUI();
             })
             .catch(function(err) {
-                spinner.classList.remove('active');
-                btns.forEach(function(b) { b.disabled = false; });
-                document.getElementById('upload-btn').textContent = 'Parse Configuration';
-                document.getElementById('api-btn').textContent = 'Connect & Parse';
+                resetUI();
                 var existing = document.querySelector('.alert');
                 if (existing) existing.remove();
                 var div = document.createElement('div');
