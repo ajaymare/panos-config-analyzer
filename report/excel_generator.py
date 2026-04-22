@@ -60,10 +60,35 @@ def generate(results: list, config_type: str = 'unknown') -> str:
     ws['A2'].font = styles.subtitle_font
     ws['A2'].alignment = Alignment(horizontal='center')
 
-    # Build result lookup
-    result_map = {}
+    # Build result lookup — aggregate per feature (enabled if ANY are enabled)
+    from parsers.base import FeatureResult
+    result_groups = {}
     for r in results:
-        result_map[r.feature_name] = r
+        if r.feature_name not in result_groups:
+            result_groups[r.feature_name] = []
+        result_groups[r.feature_name].append(r)
+
+    result_map = {}
+    for fname, rlist in result_groups.items():
+        enabled = any(r.enabled for r in rlist)
+        # Collect summaries from enabled results, deduplicate
+        summaries = []
+        sources = []
+        for r in rlist:
+            if r.enabled:
+                if r.summary not in summaries:
+                    summaries.append(r.summary)
+                if r.source not in sources:
+                    sources.append(r.source)
+        if not summaries:
+            summaries = [rlist[0].summary]
+            sources = [rlist[0].source]
+        result_map[fname] = FeatureResult(
+            feature_name=fname,
+            enabled=enabled,
+            summary='; '.join(summaries),
+            source=', '.join(sources),
+        )
 
     # Quick reference by category
     row = 4
