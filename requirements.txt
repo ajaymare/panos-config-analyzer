@@ -1,0 +1,5 @@
+flask>=3.0
+gunicorn>=22.0
+openpyxl>=3.1
+pan-os-python>=1.12
+lxml>=5.0

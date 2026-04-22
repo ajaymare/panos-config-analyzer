@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PAN-OS SD-WAN Config Parser</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+
+<div class="header">
+    <h1>PAN-OS SD-WAN Configuration Parser</h1>
+    <p>Upload a config XML or connect to a live device to generate an SD-WAN feature report</p>
+</div>
+
+<div class="container">
+    {% if error %}
+    <div class="alert alert-error">{{ error }}</div>
+    {% endif %}
+
+    <div class="card">
+        <div class="tabs">
+            <div class="tab active" onclick="switchTab('upload')">Upload XML File</div>
+            <div class="tab" onclick="switchTab('api')">Connect via API</div>
+        </div>
+
+        <!-- Upload Tab -->
+        <div class="tab-content active" id="tab-upload">
+            <form method="POST" action="/parse" enctype="multipart/form-data" id="upload-form">
+                <input type="hidden" name="method" value="upload">
+                <div class="form-group">
+                    <label>Configuration XML File</label>
+                    <input type="file" name="config_file" accept=".xml,.txt" required>
+                </div>
+                <p class="info-text">
+                    Export your running config from Panorama or NGFW:<br>
+                    <strong>Panorama:</strong> Device &rarr; Setup &rarr; Operations &rarr; Export named configuration snapshot<br>
+                    <strong>NGFW:</strong> Device &rarr; Setup &rarr; Operations &rarr; Export named configuration snapshot<br>
+                    Or via CLI: <code>show config running</code> &rarr; save to XML
+                </p>
+                <br>
+                <button type="submit" class="btn btn-primary" id="upload-btn">Parse Configuration</button>
+            </form>
+        </div>
+
+        <!-- API Tab -->
+        <div class="tab-content" id="tab-api">
+            <form method="POST" action="/parse" id="api-form">
+                <input type="hidden" name="method" value="api">
+                <div class="form-group">
+                    <label>Hostname / IP Address</label>
+                    <input type="text" name="hostname" placeholder="10.0.0.1 or panorama.example.com">
+                </div>
+                <div class="form-group">
+                    <label>API Key</label>
+                    <input type="password" name="api_key" placeholder="Your PAN-OS API key">
+                </div>
+                <div class="checkbox-group">
+                    <input type="checkbox" name="verify_ssl" id="verify_ssl">
+                    <label for="verify_ssl">Verify SSL Certificate</label>
+                </div>
+                <p class="info-text">
+                    Generate an API key: <code>curl -k -X GET 'https://&lt;host&gt;/api/?type=keygen&amp;user=admin&amp;password=admin'</code>
+                </p>
+                <br>
+                <button type="submit" class="btn btn-primary" id="api-btn">Connect &amp; Parse</button>
+            </form>
+        </div>
+    </div>
+
+    <div class="spinner" id="spinner">
+        <p style="margin-top: 12px; font-size: 13px; color: var(--text-secondary);">
+            Parsing configuration and generating report...
+        </p>
+    </div>
+</div>
+
+<div class="footer">
+    PAN-OS SD-WAN Config Parser &mdash; Supports Panorama &amp; NGFW configurations
+</div>
+
+<script>
+function switchTab(tab) {
+    document.querySelectorAll('.tab').forEach(function(t) { t.classList.remove('active'); });
+    document.querySelectorAll('.tab-content').forEach(function(c) { c.classList.remove('active'); });
+    if (tab === 'upload') {
+        document.querySelectorAll('.tab')[0].classList.add('active');
+        document.getElementById('tab-upload').classList.add('active');
+    } else {
+        document.querySelectorAll('.tab')[1].classList.add('active');
+        document.getElementById('tab-api').classList.add('active');
+    }
+}
+
+document.querySelectorAll('form').forEach(function(form) {
+    form.addEventListener('submit', function() {
+        document.getElementById('spinner').classList.add('active');
+        var btns = form.querySelectorAll('button');
+        btns.forEach(function(b) { b.disabled = true; b.textContent = 'Processing...'; });
+    });
+});
+</script>
+
+</body>
+</html>
