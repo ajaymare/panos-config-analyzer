@@ -10,7 +10,7 @@
 
 <div class="header">
     <h1>PAN-OS SD-WAN Configuration Parser</h1>
-    <p>Upload a config XML or connect to a live device to generate an SD-WAN feature report</p>
+    <p>Upload config XMLs or connect to a live device to generate an SD-WAN feature report</p>
 </div>
 
 <div class="container">
@@ -20,7 +20,7 @@
 
     <div class="card">
         <div class="tabs">
-            <div class="tab active" onclick="switchTab('upload')">Upload XML File</div>
+            <div class="tab active" onclick="switchTab('upload')">Upload XML Files</div>
             <div class="tab" onclick="switchTab('api')">Connect via API</div>
         </div>
 
@@ -29,11 +29,12 @@
             <form method="POST" action="/parse" enctype="multipart/form-data" id="upload-form">
                 <input type="hidden" name="method" value="upload">
                 <div class="form-group">
-                    <label>Configuration XML File</label>
-                    <input type="file" name="config_file" accept=".xml,.txt" required>
+                    <label>Configuration XML Files</label>
+                    <input type="file" name="config_files" accept=".xml,.txt" multiple required id="file-input">
                 </div>
+                <div class="file-list" id="file-list"></div>
                 <p class="info-text">
-                    Export your running config from Panorama or NGFW:<br>
+                    Upload one or multiple configs. Multiple files produces a <strong>comparison report</strong>.<br>
                     <strong>Panorama:</strong> Device &rarr; Setup &rarr; Operations &rarr; Export named configuration snapshot<br>
                     <strong>NGFW:</strong> Device &rarr; Setup &rarr; Operations &rarr; Export named configuration snapshot<br>
                     Or via CLI: <code>show config running</code> &rarr; save to XML
@@ -92,11 +93,76 @@ function switchTab(tab) {
     }
 }
 
+// Show selected file names
+document.getElementById('file-input').addEventListener('change', function() {
+    var list = document.getElementById('file-list');
+    list.innerHTML = '';
+    var files = this.files;
+    if (files.length === 0) return;
+    for (var i = 0; i < files.length; i++) {
+        var div = document.createElement('div');
+        div.className = 'file-item';
+        var size = (files[i].size / 1024).toFixed(1);
+        div.textContent = files[i].name + ' (' + size + ' KB)';
+        list.appendChild(div);
+    }
+    // Update button text
+    var btn = document.getElementById('upload-btn');
+    if (files.length > 1) {
+        btn.textContent = 'Compare ' + files.length + ' Configurations';
+    } else {
+        btn.textContent = 'Parse Configuration';
+    }
+});
+
 document.querySelectorAll('form').forEach(function(form) {
-    form.addEventListener('submit', function() {
-        document.getElementById('spinner').classList.add('active');
+    form.addEventListener('submit', function(e) {
+        e.preventDefault();
+        var spinner = document.getElementById('spinner');
         var btns = form.querySelectorAll('button');
+        spinner.classList.add('active');
         btns.forEach(function(b) { b.disabled = true; b.textContent = 'Processing...'; });
+
+        var formData = new FormData(form);
+        fetch('/parse', { method: 'POST', body: formData })
+            .then(function(resp) {
+                if (!resp.ok) {
+                    return resp.text().then(function(t) { throw new Error(t); });
+                }
+                var filename = 'sdwan_report.xlsx';
+                var cd = resp.headers.get('content-disposition');
+                if (cd) {
+                    var match = cd.match(/filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/);
+                    if (match) filename = match[1].replace(/['"]/g, '');
+                }
+                return resp.blob().then(function(blob) { return { blob: blob, filename: filename }; });
+            })
+            .then(function(data) {
+                var url = URL.createObjectURL(data.blob);
+                var a = document.createElement('a');
+                a.href = url;
+                a.download = data.filename;
+                document.body.appendChild(a);
+                a.click();
+                a.remove();
+                URL.revokeObjectURL(url);
+                spinner.classList.remove('active');
+                btns.forEach(function(b) { b.disabled = false; });
+                document.getElementById('upload-btn').textContent = 'Parse Configuration';
+                document.getElementById('api-btn').textContent = 'Connect & Parse';
+            })
+            .catch(function(err) {
+                spinner.classList.remove('active');
+                btns.forEach(function(b) { b.disabled = false; });
+                document.getElementById('upload-btn').textContent = 'Parse Configuration';
+                document.getElementById('api-btn').textContent = 'Connect & Parse';
+                var existing = document.querySelector('.alert');
+                if (existing) existing.remove();
+                var div = document.createElement('div');
+                div.className = 'alert alert-error';
+                div.textContent = 'Error: ' + err.message;
+                document.querySelector('.container').insertBefore(div, document.querySelector('.card'));
+            });
     });
 });
 </script>

@@ -4,110 +4,530 @@ import uuid
 from datetime import datetime
 
 from openpyxl import Workbook
+from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
 from openpyxl.utils import get_column_letter
 
 from . import styles
-from ..config import REPORT_DIR
+import config as app_config
+REPORT_DIR = app_config.REPORT_DIR
+
+# Category grouping for quick reference
+FEATURE_CATEGORIES = {
+    'SD-WAN Core': [
+        'SD-WAN Interface Profiles', 'Path Quality Profiles',
+        'Traffic Distribution Profiles', 'SD-WAN Policy Rules',
+    ],
+    'VPN & Topology': [
+        'VPN/IPSec Tunnels', 'VPN Clusters - Topology',
+    ],
+    'Routing & Forwarding': [
+        'Routing (BGP/OSPF/ECMP)', 'Policy-Based Forwarding',
+    ],
+    'Monitoring': [
+        'SaaS Quality Monitoring', 'Digital Experience Monitoring',
+    ],
+    'Network Infrastructure': [
+        'Zones and Interfaces', 'QoS Profiles',
+        'Link Management', 'Certificate Profiles',
+    ],
+}
+
+# Category colors
+CAT_COLORS = {
+    'SD-WAN Core': '1B4F72',
+    'VPN & Topology': '6C3483',
+    'Routing & Forwarding': '1E8449',
+    'Monitoring': 'B9770E',
+    'Network Infrastructure': '2E86C1',
+}
 
 
 def generate(results: list, config_type: str = 'unknown') -> str:
-    """Generate Excel workbook with summary and detail sheets.
-
-    Args:
-        results: List of FeatureResult objects from all parsers
-        config_type: 'panorama', 'ngfw', or 'unknown'
-
-    Returns:
-        Path to generated Excel file
-    """
     wb = Workbook()
 
-    # ── Summary Sheet ──
+    # ── Quick Reference Sheet ──
     ws = wb.active
-    ws.title = 'Summary'
+    ws.title = 'Quick Reference'
 
-    # Title row
-    ws.merge_cells('A1:D1')
-    title_cell = ws['A1']
-    title_cell.value = 'PAN-OS SD-WAN Feature Report'
-    title_cell.font = styles.title_font
+    # Title
+    ws.merge_cells('A1:F1')
+    ws['A1'].value = 'PAN-OS SD-WAN Feature Report'
+    ws['A1'].font = Font(name='Calibri', size=16, bold=True, color=styles.BLUE)
+    ws['A1'].alignment = Alignment(horizontal='center')
 
-    # Metadata
-    ws['A2'] = f'Generated: {datetime.now().strftime("%Y-%m-%d %H:%M:%S")}'
+    ws.merge_cells('A2:F2')
+    ws['A2'].value = f'Generated: {datetime.now().strftime("%Y-%m-%d %H:%M:%S")}  |  Config Type: {config_type.upper()}'
     ws['A2'].font = styles.subtitle_font
-    ws['A3'] = f'Config Type: {config_type.upper()}'
-    ws['A3'].font = styles.subtitle_font
+    ws['A2'].alignment = Alignment(horizontal='center')
 
-    # Header row
-    header_row = 5
-    headers = ['Feature', 'Status', 'Summary', 'Source']
+    # Build result lookup
+    result_map = {}
+    for r in results:
+        result_map[r.feature_name] = r
+
+    # Quick reference by category
+    row = 4
+    headers = ['Category', 'Feature', 'Status', 'Summary', 'Count', 'Source']
     for col, h in enumerate(headers, 1):
-        ws.cell(row=header_row, column=col, value=h)
-    styles.style_header_row(ws, header_row, len(headers))
+        ws.cell(row=row, column=col, value=h)
+    styles.style_header_row(ws, row, len(headers))
+    row += 1
 
-    # Data rows
-    row = header_row + 1
-    for result in results:
-        ws.cell(row=row, column=1, value=result.feature_name)
-        styles.style_data_cell(ws.cell(row=row, column=1), row - header_row - 1)
+    for cat_name, features in FEATURE_CATEGORIES.items():
+        cat_color = CAT_COLORS.get(cat_name, styles.BLUE)
+        cat_fill = PatternFill(start_color=cat_color, end_color=cat_color, fill_type='solid')
+        cat_font = Font(name='Calibri', size=11, bold=True, color='FFFFFF')
 
-        status_cell = ws.cell(row=row, column=2)
-        styles.style_status_cell(status_cell, result.enabled)
-
-        ws.cell(row=row, column=3, value=result.summary)
-        styles.style_data_cell(ws.cell(row=row, column=3), row - header_row - 1)
-
-        ws.cell(row=row, column=4, value=result.source)
-        styles.style_data_cell(ws.cell(row=row, column=4), row - header_row - 1)
-
+        # Category header row
+        for col in range(1, len(headers) + 1):
+            cell = ws.cell(row=row, column=col)
+            cell.fill = cat_fill
+            cell.font = cat_font
+            cell.border = styles.thin_border
+        ws.cell(row=row, column=1, value=cat_name)
         row += 1
 
-    # Auto-filter
-    ws.auto_filter.ref = f'A{header_row}:D{row - 1}'
-    styles.auto_width(ws)
+        for feat_name in features:
+            r = result_map.get(feat_name)
+            if r is None:
+                # Feature parser not found — show as N/A
+                ws.cell(row=row, column=1, value='')
+                styles.style_data_cell(ws.cell(row=row, column=1), row)
+                ws.cell(row=row, column=2, value=feat_name)
+                styles.style_data_cell(ws.cell(row=row, column=2), row)
+                cell = ws.cell(row=row, column=3)
+                cell.value = 'N/A'
+                cell.font = Font(name='Calibri', size=10, color='999999')
+                cell.alignment = Alignment(horizontal='center')
+                cell.border = styles.thin_border
+                for col in range(4, len(headers) + 1):
+                    styles.style_data_cell(ws.cell(row=row, column=col), row)
+                row += 1
+                continue
 
-    # Freeze panes below header
-    ws.freeze_panes = f'A{header_row + 1}'
+            ws.cell(row=row, column=1, value='')
+            styles.style_data_cell(ws.cell(row=row, column=1), row)
 
-    # ── Detail Sheets ──
-    seen_sheets = set()
+            ws.cell(row=row, column=2, value=feat_name)
+            styles.style_data_cell(ws.cell(row=row, column=2), row)
+
+            styles.style_status_cell(ws.cell(row=row, column=3), r.enabled)
+
+            ws.cell(row=row, column=4, value=r.summary)
+            styles.style_data_cell(ws.cell(row=row, column=4), row)
+
+            # Count — extract number from summary
+            count = ''
+            for word in r.summary.split():
+                if word.isdigit():
+                    count = int(word)
+                    break
+            ws.cell(row=row, column=5, value=count)
+            count_cell = ws.cell(row=row, column=5)
+            count_cell.alignment = Alignment(horizontal='center')
+            count_cell.border = styles.thin_border
+            if count and int(count) > 0:
+                count_cell.font = Font(name='Calibri', size=11, bold=True, color=styles.GREEN)
+            else:
+                count_cell.font = styles.data_font
+
+            ws.cell(row=row, column=6, value=r.source)
+            styles.style_data_cell(ws.cell(row=row, column=6), row)
+            row += 1
+
+        # Blank row between categories
+        row += 1
+
+    # Enabled/Disabled totals
+    row += 1
+    enabled_count = sum(1 for r in results if r.enabled)
+    disabled_count = sum(1 for r in results if not r.enabled)
+    ws.cell(row=row, column=1, value='Total Features Configured:')
+    ws.cell(row=row, column=1).font = Font(name='Calibri', size=11, bold=True)
+    ws.cell(row=row, column=2, value=enabled_count)
+    ws.cell(row=row, column=2).font = Font(name='Calibri', size=12, bold=True, color=styles.GREEN)
+    ws.cell(row=row, column=3, value='Not Configured:')
+    ws.cell(row=row, column=3).font = Font(name='Calibri', size=11, bold=True)
+    ws.cell(row=row, column=4, value=disabled_count)
+    ws.cell(row=row, column=4).font = Font(name='Calibri', size=12, bold=True, color=styles.RED)
+
+    styles.auto_width(ws, min_width=12, max_width=55)
+    ws.freeze_panes = 'A5'
+
+    # ── Detail Sheets — merge same feature into one sheet ──
+    # Group results by feature name
+    from collections import OrderedDict
+    grouped = OrderedDict()
     for result in results:
         if not result.rows or not result.columns:
             continue
+        key = result.feature_name
+        if key not in grouped:
+            grouped[key] = {'columns': result.columns, 'rows': []}
+        # Add source column to each row
+        for data_row in result.rows:
+            grouped[key]['rows'].append(list(data_row) + [result.source])
 
-        # Ensure unique sheet name (max 31 chars)
-        sheet_name = result.feature_name[:31]
+    seen_sheets = set(['Quick Reference'])
+    for feat_name, data in grouped.items():
+        sheet_name = feat_name
+        for ch in '/\\?*[]:':
+            sheet_name = sheet_name.replace(ch, '-')
+        sheet_name = sheet_name[:31]
         if sheet_name in seen_sheets:
             sheet_name = sheet_name[:28] + f'_{len(seen_sheets)}'
         seen_sheets.add(sheet_name)
 
         ds = wb.create_sheet(title=sheet_name)
 
-        # Source label
-        ds['A1'] = f'Source: {result.source}'
-        ds['A1'].font = styles.subtitle_font
-
-        # Headers
-        h_row = 3
-        for col, h in enumerate(result.columns, 1):
+        # Headers — add Source column
+        h_row = 1
+        all_cols = data['columns'] + ['Source']
+        for col, h in enumerate(all_cols, 1):
             ds.cell(row=h_row, column=col, value=h)
-        styles.style_header_row(ds, h_row, len(result.columns))
+        styles.style_header_row(ds, h_row, len(all_cols))
 
-        # Data
-        for r_idx, data_row in enumerate(result.rows):
+        # Data rows
+        for r_idx, data_row in enumerate(data['rows']):
             for c_idx, val in enumerate(data_row):
                 cell = ds.cell(row=h_row + 1 + r_idx, column=c_idx + 1, value=val)
                 styles.style_data_cell(cell, r_idx)
 
         # Auto-filter and width
-        if result.rows:
-            last_col = get_column_letter(len(result.columns))
-            ds.auto_filter.ref = f'A{h_row}:{last_col}{h_row + len(result.rows)}'
+        if data['rows']:
+            last_col = get_column_letter(len(all_cols))
+            ds.auto_filter.ref = f'A{h_row}:{last_col}{h_row + len(data["rows"])}'
         styles.auto_width(ds)
         ds.freeze_panes = f'A{h_row + 1}'
 
+    # ── All Features Sheet (last) — split into Enabled and Disabled sections ──
+    ws2 = wb.create_sheet(title='All Features')
+    all_headers = ['Feature', 'Status', 'Summary', 'Source']
+
+    enabled_results = [r for r in results if r.enabled]
+    disabled_results = [r for r in results if not r.enabled]
+
+    r2 = 1
+
+    # Enabled section header
+    enabled_color = '1E8449'
+    enabled_section_fill = PatternFill(start_color=enabled_color, end_color=enabled_color, fill_type='solid')
+    enabled_section_font = Font(name='Calibri', size=12, bold=True, color='FFFFFF')
+    for col in range(1, len(all_headers) + 1):
+        cell = ws2.cell(row=r2, column=col)
+        cell.fill = enabled_section_fill
+        cell.font = enabled_section_font
+        cell.border = styles.thin_border
+    ws2.cell(row=r2, column=1, value=f'Enabled Features ({len(enabled_results)})')
+    r2 += 1
+
+    # Enabled headers
+    for col, h in enumerate(all_headers, 1):
+        ws2.cell(row=r2, column=col, value=h)
+    styles.style_header_row(ws2, r2, len(all_headers))
+    r2 += 1
+
+    # Enabled rows
+    for result in enabled_results:
+        ws2.cell(row=r2, column=1, value=result.feature_name)
+        styles.style_data_cell(ws2.cell(row=r2, column=1), r2)
+        styles.style_status_cell(ws2.cell(row=r2, column=2), result.enabled)
+        ws2.cell(row=r2, column=3, value=result.summary)
+        styles.style_data_cell(ws2.cell(row=r2, column=3), r2)
+        ws2.cell(row=r2, column=4, value=result.source)
+        styles.style_data_cell(ws2.cell(row=r2, column=4), r2)
+        r2 += 1
+
+    # Blank row separator
+    r2 += 1
+
+    # Disabled section header
+    disabled_color = 'C0392B'
+    disabled_section_fill = PatternFill(start_color=disabled_color, end_color=disabled_color, fill_type='solid')
+    disabled_section_font = Font(name='Calibri', size=12, bold=True, color='FFFFFF')
+    for col in range(1, len(all_headers) + 1):
+        cell = ws2.cell(row=r2, column=col)
+        cell.fill = disabled_section_fill
+        cell.font = disabled_section_font
+        cell.border = styles.thin_border
+    ws2.cell(row=r2, column=1, value=f'Disabled / Not Configured ({len(disabled_results)})')
+    r2 += 1
+
+    # Disabled headers
+    for col, h in enumerate(all_headers, 1):
+        ws2.cell(row=r2, column=col, value=h)
+    styles.style_header_row(ws2, r2, len(all_headers))
+    r2 += 1
+
+    # Disabled rows
+    for result in disabled_results:
+        ws2.cell(row=r2, column=1, value=result.feature_name)
+        styles.style_data_cell(ws2.cell(row=r2, column=1), r2)
+        styles.style_status_cell(ws2.cell(row=r2, column=2), result.enabled)
+        ws2.cell(row=r2, column=3, value=result.summary)
+        styles.style_data_cell(ws2.cell(row=r2, column=3), r2)
+        ws2.cell(row=r2, column=4, value=result.source)
+        styles.style_data_cell(ws2.cell(row=r2, column=4), r2)
+        r2 += 1
+
+    styles.auto_width(ws2)
+    ws2.freeze_panes = 'A3'
+
     # Save
     filename = f'sdwan_report_{datetime.now().strftime("%Y%m%d_%H%M%S")}_{uuid.uuid4().hex[:6]}.xlsx'
+    filepath = os.path.join(REPORT_DIR, filename)
+    wb.save(filepath)
+    return filepath
+
+
+def _sanitize_sheet_name(name, seen):
+    """Sanitize a string for use as an Excel sheet name."""
+    for ch in '/\\?*[]:':
+        name = name.replace(ch, '-')
+    name = name[:31]
+    if name in seen:
+        name = name[:28] + f'_{len(seen)}'
+    seen.add(name)
+    return name
+
+
+def _aggregate_feature(results_list, feature_name):
+    """Aggregate a feature across multiple results — enabled if any are enabled."""
+    enabled = any(r.enabled for r in results_list)
+    summaries = [r.summary for r in results_list if r.enabled and r.summary != 'Not configured']
+    if not summaries:
+        summaries = [r.summary for r in results_list]
+    combined = '; '.join(dict.fromkeys(summaries))  # dedupe preserving order
+    return enabled, combined
+
+
+def generate_comparison(configs_data: list) -> str:
+    """Generate a comparison Excel report from multiple config files.
+
+    Args:
+        configs_data: list of dicts with keys: filename, config_type, results
+    """
+    from collections import OrderedDict
+
+    wb = Workbook()
+    config_names = [c['filename'] for c in configs_data]
+    num_configs = len(config_names)
+
+    # Build per-config feature maps: {feature_name: aggregated (enabled, summary)}
+    config_features = []
+    for cfg in configs_data:
+        feat_map = {}
+        for r in cfg['results']:
+            if r.feature_name not in feat_map:
+                feat_map[r.feature_name] = []
+            feat_map[r.feature_name].append(r)
+        # Aggregate per feature
+        aggregated = {}
+        for fname, rlist in feat_map.items():
+            enabled, summary = _aggregate_feature(rlist, fname)
+            aggregated[fname] = {'enabled': enabled, 'summary': summary}
+        config_features.append(aggregated)
+
+    # ── Sheet 1: Comparison Summary ──
+    ws = wb.active
+    ws.title = 'Comparison Summary'
+
+    # Title
+    total_cols = 1 + num_configs * 2  # Feature + (Status, Summary) per config
+    last_col_letter = get_column_letter(total_cols)
+    ws.merge_cells(f'A1:{last_col_letter}1')
+    ws['A1'].value = 'PAN-OS SD-WAN Configuration Comparison'
+    ws['A1'].font = Font(name='Calibri', size=16, bold=True, color=styles.BLUE)
+    ws['A1'].alignment = Alignment(horizontal='center')
+
+    ws.merge_cells(f'A2:{last_col_letter}2')
+    config_types = ', '.join(f"{c['filename']} ({c['config_type']})" for c in configs_data)
+    ws['A2'].value = f'Generated: {datetime.now().strftime("%Y-%m-%d %H:%M:%S")}  |  Configs: {config_types}'
+    ws['A2'].font = styles.subtitle_font
+    ws['A2'].alignment = Alignment(horizontal='center')
+
+    # Header row: Feature | Config1 Status | Config1 Summary | Config2 Status | ...
+    row = 4
+    headers = ['Feature']
+    for name in config_names:
+        short = name[:20] if len(name) > 20 else name
+        headers.append(f'{short} Status')
+        headers.append(f'{short} Summary')
+
+    for col, h in enumerate(headers, 1):
+        ws.cell(row=row, column=col, value=h)
+    styles.style_header_row(ws, row, len(headers))
+    row += 1
+
+    # Feature rows grouped by category
+    for cat_name, features in FEATURE_CATEGORIES.items():
+        cat_color = CAT_COLORS.get(cat_name, styles.BLUE)
+        cat_fill = PatternFill(start_color=cat_color, end_color=cat_color, fill_type='solid')
+        cat_font = Font(name='Calibri', size=11, bold=True, color='FFFFFF')
+
+        for col in range(1, len(headers) + 1):
+            cell = ws.cell(row=row, column=col)
+            cell.fill = cat_fill
+            cell.font = cat_font
+            cell.border = styles.thin_border
+        ws.cell(row=row, column=1, value=cat_name)
+        row += 1
+
+        for feat_name in features:
+            ws.cell(row=row, column=1, value=feat_name)
+            styles.style_data_cell(ws.cell(row=row, column=1), row)
+
+            for cfg_idx in range(num_configs):
+                feat_data = config_features[cfg_idx].get(feat_name)
+                status_col = 2 + cfg_idx * 2
+                summary_col = 3 + cfg_idx * 2
+
+                if feat_data:
+                    styles.style_status_cell(ws.cell(row=row, column=status_col), feat_data['enabled'])
+                    ws.cell(row=row, column=summary_col, value=feat_data['summary'])
+                    styles.style_data_cell(ws.cell(row=row, column=summary_col), row)
+                else:
+                    cell = ws.cell(row=row, column=status_col)
+                    cell.value = 'N/A'
+                    cell.font = Font(name='Calibri', size=10, color='999999')
+                    cell.alignment = Alignment(horizontal='center')
+                    cell.border = styles.thin_border
+                    styles.style_data_cell(ws.cell(row=row, column=summary_col), row)
+
+            row += 1
+        row += 1  # Blank row between categories
+
+    # Totals per config
+    row += 1
+    ws.cell(row=row, column=1, value='Totals')
+    ws.cell(row=row, column=1).font = Font(name='Calibri', size=11, bold=True)
+    for cfg_idx in range(num_configs):
+        status_col = 2 + cfg_idx * 2
+        summary_col = 3 + cfg_idx * 2
+        enabled = sum(1 for f in config_features[cfg_idx].values() if f['enabled'])
+        disabled = sum(1 for f in config_features[cfg_idx].values() if not f['enabled'])
+        ws.cell(row=row, column=status_col, value=f'{enabled} Enabled')
+        ws.cell(row=row, column=status_col).font = Font(name='Calibri', size=11, bold=True, color=styles.GREEN)
+        ws.cell(row=row, column=summary_col, value=f'{disabled} Disabled')
+        ws.cell(row=row, column=summary_col).font = Font(name='Calibri', size=11, bold=True, color=styles.RED)
+
+    styles.auto_width(ws, min_width=12, max_width=40)
+    ws.freeze_panes = 'B5'
+
+    # ── Detail Sheets — merge all configs per feature ──
+    all_results_with_config = []
+    for cfg in configs_data:
+        for r in cfg['results']:
+            all_results_with_config.append((cfg['filename'], r))
+
+    grouped = OrderedDict()
+    for cfg_name, result in all_results_with_config:
+        if not result.rows or not result.columns:
+            continue
+        key = result.feature_name
+        if key not in grouped:
+            grouped[key] = {'columns': result.columns, 'rows': []}
+        for data_row in result.rows:
+            grouped[key]['rows'].append(list(data_row) + [result.source, cfg_name])
+
+    seen_sheets = set(['Comparison Summary'])
+    for feat_name, data in grouped.items():
+        sheet_name = _sanitize_sheet_name(feat_name, seen_sheets)
+        ds = wb.create_sheet(title=sheet_name)
+
+        h_row = 1
+        all_cols = data['columns'] + ['Source', 'Config File']
+        for col, h in enumerate(all_cols, 1):
+            ds.cell(row=h_row, column=col, value=h)
+        styles.style_header_row(ds, h_row, len(all_cols))
+
+        for r_idx, data_row in enumerate(data['rows']):
+            for c_idx, val in enumerate(data_row):
+                cell = ds.cell(row=h_row + 1 + r_idx, column=c_idx + 1, value=val)
+                styles.style_data_cell(cell, r_idx)
+
+        if data['rows']:
+            last_col = get_column_letter(len(all_cols))
+            ds.auto_filter.ref = f'A{h_row}:{last_col}{h_row + len(data["rows"])}'
+        styles.auto_width(ds)
+        ds.freeze_panes = f'A{h_row + 1}'
+
+    # ── All Features Sheet (last) ──
+    ws2 = wb.create_sheet(title='All Features')
+    all_headers = ['Config File', 'Feature', 'Status', 'Summary', 'Source']
+
+    all_flat = []
+    for cfg in configs_data:
+        for r in cfg['results']:
+            all_flat.append((cfg['filename'], r))
+
+    enabled_flat = [(c, r) for c, r in all_flat if r.enabled]
+    disabled_flat = [(c, r) for c, r in all_flat if not r.enabled]
+
+    r2 = 1
+
+    # Enabled section
+    enabled_section_fill = PatternFill(start_color='1E8449', end_color='1E8449', fill_type='solid')
+    section_font = Font(name='Calibri', size=12, bold=True, color='FFFFFF')
+    for col in range(1, len(all_headers) + 1):
+        cell = ws2.cell(row=r2, column=col)
+        cell.fill = enabled_section_fill
+        cell.font = section_font
+        cell.border = styles.thin_border
+    ws2.cell(row=r2, column=1, value=f'Enabled Features ({len(enabled_flat)})')
+    r2 += 1
+
+    for col, h in enumerate(all_headers, 1):
+        ws2.cell(row=r2, column=col, value=h)
+    styles.style_header_row(ws2, r2, len(all_headers))
+    r2 += 1
+
+    for cfg_name, result in enabled_flat:
+        ws2.cell(row=r2, column=1, value=cfg_name)
+        styles.style_data_cell(ws2.cell(row=r2, column=1), r2)
+        ws2.cell(row=r2, column=2, value=result.feature_name)
+        styles.style_data_cell(ws2.cell(row=r2, column=2), r2)
+        styles.style_status_cell(ws2.cell(row=r2, column=3), result.enabled)
+        ws2.cell(row=r2, column=4, value=result.summary)
+        styles.style_data_cell(ws2.cell(row=r2, column=4), r2)
+        ws2.cell(row=r2, column=5, value=result.source)
+        styles.style_data_cell(ws2.cell(row=r2, column=5), r2)
+        r2 += 1
+
+    r2 += 1
+
+    # Disabled section
+    disabled_section_fill = PatternFill(start_color='C0392B', end_color='C0392B', fill_type='solid')
+    for col in range(1, len(all_headers) + 1):
+        cell = ws2.cell(row=r2, column=col)
+        cell.fill = disabled_section_fill
+        cell.font = section_font
+        cell.border = styles.thin_border
+    ws2.cell(row=r2, column=1, value=f'Disabled / Not Configured ({len(disabled_flat)})')
+    r2 += 1
+
+    for col, h in enumerate(all_headers, 1):
+        ws2.cell(row=r2, column=col, value=h)
+    styles.style_header_row(ws2, r2, len(all_headers))
+    r2 += 1
+
+    for cfg_name, result in disabled_flat:
+        ws2.cell(row=r2, column=1, value=cfg_name)
+        styles.style_data_cell(ws2.cell(row=r2, column=1), r2)
+        ws2.cell(row=r2, column=2, value=result.feature_name)
+        styles.style_data_cell(ws2.cell(row=r2, column=2), r2)
+        styles.style_status_cell(ws2.cell(row=r2, column=3), result.enabled)
+        ws2.cell(row=r2, column=4, value=result.summary)
+        styles.style_data_cell(ws2.cell(row=r2, column=4), r2)
+        ws2.cell(row=r2, column=5, value=result.source)
+        styles.style_data_cell(ws2.cell(row=r2, column=5), r2)
+        r2 += 1
+
+    styles.auto_width(ws2)
+    ws2.freeze_panes = 'A3'
+
+    # Save
+    filename = f'sdwan_comparison_{datetime.now().strftime("%Y%m%d_%H%M%S")}_{uuid.uuid4().hex[:6]}.xlsx'
     filepath = os.path.join(REPORT_DIR, filename)
     wb.save(filepath)
     return filepath

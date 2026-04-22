@@ -79,11 +79,17 @@ def style_status_cell(cell, enabled):
 
 def auto_width(ws, min_width=10, max_width=50):
     """Auto-adjust column widths based on content."""
+    from openpyxl.cell.cell import MergedCell
     for col in ws.columns:
         max_len = 0
-        col_letter = col[0].column_letter
+        col_letter = None
         for cell in col:
+            if isinstance(cell, MergedCell):
+                continue
+            if col_letter is None:
+                col_letter = cell.column_letter
             if cell.value:
                 max_len = max(max_len, len(str(cell.value)))
-        adjusted = min(max(max_len + 2, min_width), max_width)
-        ws.column_dimensions[col_letter].width = adjusted
+        if col_letter:
+            adjusted = min(max(max_len + 2, min_width), max_width)
+            ws.column_dimensions[col_letter].width = adjusted
