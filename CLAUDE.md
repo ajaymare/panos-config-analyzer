@@ -46,6 +46,3 @@ docker run -d --name panos-parser -p 8080:8080 panos-sdwan-parser:latest
 
 ### pan-os-python SDK
 SDK has no SD-WAN classes. Used only for API connectivity (`xapi.show('/config')`). All extraction uses `xml.etree.ElementTree`.
-
-## Contributor
-- Ajay Mare
