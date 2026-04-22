@@ -14,6 +14,7 @@ PAN-OS SD-WAN Configuration Parser — a Docker-based Flask tool that parses Pal
 - **Report** (`report/excel_generator.py`): Two report modes:
   - `generate()` — Single config: Quick Reference + detail sheets + All Features
   - `generate_comparison()` — Multi config: Comparison Summary (side-by-side) + merged detail sheets + All Features
+- **Masker** (`report/masker.py`): Sensitive data masking with 6 categories (IPs, hostnames, devices, passwords, certs, network addresses)
 
 ## Key Files
 
@@ -21,6 +22,7 @@ PAN-OS SD-WAN Configuration Parser — a Docker-based Flask tool that parses Pal
 - `parsers/base.py` — `BaseParser` ABC, `FeatureResult` and `ConfigContainer` dataclasses, shared XML helpers
 - `parsers/config_detector.py` — Panorama/NGFW detection, container enumeration (templates, device-groups, shared)
 - `report/excel_generator.py` — Single report + comparison report builders with category grouping
+- `report/masker.py` — Sensitive data masking engine (IP, hostname, device, password, cert, network categories)
 - `report/styles.py` — openpyxl cell styles (header, data, status fills, auto-width)
 - `templates/index.html` — Web UI with multi-file upload, file list with remove buttons
 - `static/style.css` — CSS with blue/corporate theme
@@ -66,6 +68,13 @@ Config detector creates containers per scope:
 - `ngfw` — xml_node points to root `config` element
 
 Parsers iterate containers and search relative XPaths. Some parsers (VPN topology) use `xml_root` directly for plugins section.
+
+### Sensitive Data Masking
+- `report/masker.py` applies masking to `FeatureResult` objects before report generation
+- 6 categories: `ip_addresses`, `hostnames`, `devices`, `passwords`, `certificates`, `network`
+- UI sends `mask_categories` form field; `app.py` calls `mask_results()` on parsed results
+- Column-based matching (maps column names to categories) + regex scanning (IPs, FQDNs)
+- Device masking uses consistent mapping (`DEVICE-001`, `DEVICE-002`) across the entire report
 
 ### pan-os-python SDK
 SDK has no SD-WAN classes. Used only for API connectivity (`xapi.show('/config')`). All extraction uses `xml.etree.ElementTree`.

@@ -9,6 +9,7 @@ Docker-based tool with a Flask web UI that parses Palo Alto Panorama/NGFW config
 - **Panorama + NGFW**: Automatically detects config type, enumerates templates, template-stacks, and device-groups
 - **14 SD-WAN Feature Parsers**: Comprehensive extraction of all SD-WAN related configuration
 - **Excel Reports**: Quick Reference summary, detailed per-feature sheets, and comparison views
+- **Sensitive Data Masking**: Selectively mask IPs, hostnames, device names, passwords, certificates, and network addresses
 - **HTTPS Support**: Self-signed certificate with nginx reverse proxy on port 9443
 - **Dockerized**: Single container, no external dependencies
 
@@ -67,6 +68,18 @@ docker run -d --name panos-parser -p 8080:8080 -p 9443:9443 ajaymare/panos-confi
 4. Comparison report downloads with side-by-side feature analysis
 5. Use the X button to remove individual files before submitting
 
+### Mask Sensitive Information
+
+Before parsing, optionally enable masking to redact sensitive data from the report:
+- **IP Addresses** — All IPs replaced with `x.x.x.x`
+- **Hostnames & FQDNs** — DNS names replaced with `***.***`
+- **Device Names & Serials** — Consistently replaced with `DEVICE-001`, `DEVICE-002`, etc.
+- **Passwords & Keys** — Pre-shared keys, API keys replaced with `********`
+- **Certificates** — CA certificate names redacted
+- **Network Addresses** — Subnets, BGP AS numbers, interface names masked
+
+Use "Select All" to enable all categories, or pick individual ones.
+
 ### Connect via API
 
 1. Generate an API key:
@@ -108,6 +121,7 @@ parser/
 │   └── connector.py        # pan-os-python SDK wrapper
 ├── report/
 │   ├── excel_generator.py  # Single + comparison report generation
+│   ├── masker.py           # Sensitive data masking engine
 │   └── styles.py           # Cell formatting
 ├── templates/
 │   └── index.html          # Web UI with multi-file upload
