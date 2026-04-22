@@ -1,11 +1,10 @@
 """Digital Experience Monitoring (DEM) parser."""
 from .base import BaseParser, FeatureResult
 
-NGFW_XPATH = './/devices/entry/plugins/sd_wan/dem/entry'
-TMPL_XPATH = './/template/entry/config/devices/entry/plugins/sd_wan/dem/entry'
-# Also check autonomous DEM config
-ADEM_XPATH = './/devices/entry/plugins/sd_wan/autonomous-dem'
-TMPL_ADEM = './/template/entry/config/devices/entry/plugins/sd_wan/autonomous-dem'
+# DEM config could be under plugins/sd_wan or device-group profiles
+PLUGIN_DEM_XPATH = './/plugins/sd_wan/dem/entry'
+DG_DEM_XPATH = 'profiles/sdwan-dem/entry'
+ADEM_XPATH = './/plugins/sd_wan/autonomous-dem'
 
 
 class DEMMonitoringParser(BaseParser):
@@ -13,27 +12,35 @@ class DEMMonitoringParser(BaseParser):
     SHEET_NAME = 'DEM'
 
     def extract(self, xml_root, containers):
-        results = []
+        # Check plugins section from xml_root
+        entries = self._find_all(xml_root, PLUGIN_DEM_XPATH)
+        adem = xml_root.find(ADEM_XPATH)
+
+        # Also check device-group profiles
         for c in containers:
             if c.config_type == 'device-group':
-                continue
-            entries = self._find_all(c.xml_node, TMPL_XPATH) or self._find_all(c.xml_node, NGFW_XPATH)
-            adem = c.xml_node.find(TMPL_ADEM)
-            if adem is None:
-                adem = c.xml_node.find(ADEM_XPATH)
+                dg_entries = self._find_all(c.xml_node, DG_DEM_XPATH)
+                entries.extend(dg_entries)
 
-            columns = ['Name', 'Target', 'Probe Type', 'Probe Interval',
-                        'Threshold', 'Autonomous DEM']
+        columns = ['Name', 'Target', 'Probe Type', 'Probe Interval',
+                    'Threshold', 'Autonomous DEM']
 
-            def build_row(entry):
-                return [
-                    self._get_name(entry),
-                    self._find_text(entry, 'target'),
-                    self._find_text(entry, 'probe-type'),
-                    self._find_text(entry, 'probe-interval'),
-                    self._find_text(entry, 'threshold'),
-                    'Enabled' if adem is not None else 'Disabled',
-                ]
+        rows = []
+        for entry in entries:
+            rows.append([
+                self._get_name(entry),
+                self._find_text(entry, 'target'),
+                self._find_text(entry, 'probe-type'),
+                self._find_text(entry, 'probe-interval'),
+                self._find_text(entry, 'threshold'),
+                'Enabled' if adem is not None else 'Disabled',
+            ])
 
-            results.append(self._make_result(c.name, entries, columns, build_row))
-        return results
+        return [FeatureResult(
+            feature_name=self.FEATURE_NAME,
+            enabled=len(rows) > 0,
+            summary=f"{len(rows)} configured" if rows else "Not configured",
+            columns=columns,
+            rows=rows,
+            source='Config',
+        )]

@@ -1,8 +1,9 @@
-"""Link Management (tags, monitoring, probes) parser."""
+"""Link Management (SD-WAN link settings on interfaces) parser."""
 from .base import BaseParser, FeatureResult
 
-NGFW_XPATH = './/devices/entry/plugins/sd_wan/sd-wan-interface-profile/entry'
-TMPL_XPATH = './/template/entry/config/devices/entry/plugins/sd_wan/sd-wan-interface-profile/entry'
+# SD-WAN link settings are on interfaces in templates
+# template/entry/config/devices/entry/network/interface/ethernet/entry/layer3/sdwan-link-settings
+INTF_XPATH = './/network/interface/ethernet/entry'
 
 
 class LinkManagementParser(BaseParser):
@@ -14,25 +15,44 @@ class LinkManagementParser(BaseParser):
         for c in containers:
             if c.config_type == 'device-group':
                 continue
-            entries = self._find_all(c.xml_node, TMPL_XPATH) or self._find_all(c.xml_node, NGFW_XPATH)
 
-            columns = ['Interface Profile', 'Link Type', 'Link Tag', 'ISP Name',
-                        'Monitor Enabled', 'Monitor IP', 'Probe Interval (s)',
-                        'Failover Threshold', 'Recovery Threshold']
+            entries = self._find_all(c.xml_node, INTF_XPATH)
 
-            def build_row(entry):
-                pm = entry.find('path-monitor')
-                return [
+            columns = ['Interface', 'SD-WAN Enabled', 'SD-WAN Profile',
+                        'Upstream NAT', 'IPv6 Enabled', 'SD-WAN Gateway',
+                        'IP Address']
+
+            rows = []
+            for entry in entries:
+                sdwan = entry.find('layer3/sdwan-link-settings')
+                if sdwan is None:
+                    continue
+                enabled = self._find_text(sdwan, 'enable', 'no')
+                profile = self._find_text(sdwan, 'sdwan-interface-profile')
+                upstream_nat = self._find_text(sdwan, 'upstream-nat/enable', 'no')
+                ipv6 = self._find_text(sdwan, 'ipv6-enable', 'no')
+
+                # Get IP and gateway from layer3/ip
+                ip_entry = entry.find('layer3/ip/entry')
+                ip_addr = self._get_name(ip_entry) if ip_entry is not None else ''
+                gateway = self._find_text(ip_entry, 'sdwan-gateway') if ip_entry is not None else ''
+
+                rows.append([
                     self._get_name(entry),
-                    self._find_text(entry, 'link-type'),
-                    self._find_text(entry, 'link-tag'),
-                    self._find_text(entry, 'isp'),
-                    'yes' if pm is not None else 'no',
-                    self._find_text(pm, 'ip-address') if pm is not None else '',
-                    self._find_text(pm, 'monitor-interval') if pm is not None else '',
-                    self._find_text(pm, 'failover-threshold') if pm is not None else '',
-                    self._find_text(pm, 'recovery-threshold') if pm is not None else '',
-                ]
+                    enabled,
+                    profile,
+                    upstream_nat,
+                    ipv6,
+                    gateway,
+                    ip_addr,
+                ])
 
-            results.append(self._make_result(c.name, entries, columns, build_row))
+            results.append(FeatureResult(
+                feature_name=self.FEATURE_NAME,
+                enabled=len(rows) > 0,
+                summary=f"{len(rows)} SD-WAN links configured" if rows else "Not configured",
+                columns=columns,
+                rows=rows,
+                source=c.name,
+            ))
         return results

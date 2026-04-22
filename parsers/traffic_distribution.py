@@ -1,8 +1,10 @@
 """Traffic Distribution Profiles parser."""
 from .base import BaseParser, FeatureResult
 
-NGFW_XPATH = './/devices/entry/plugins/sd_wan/traffic-distribution-profile/entry'
-TMPL_XPATH = './/template/entry/config/devices/entry/plugins/sd_wan/traffic-distribution-profile/entry'
+# In device-groups: profiles/sdwan-traffic-distribution/entry
+DG_XPATH = 'profiles/sdwan-traffic-distribution/entry'
+SHARED_XPATH = 'profiles/sdwan-traffic-distribution/entry'
+NGFW_XPATH = './/vsys/entry/profiles/sdwan-traffic-distribution/entry'
 
 
 class TrafficDistributionParser(BaseParser):
@@ -12,30 +14,39 @@ class TrafficDistributionParser(BaseParser):
     def extract(self, xml_root, containers):
         results = []
         for c in containers:
-            if c.config_type == 'device-group':
+            if c.config_type in ('template', 'template-stack'):
                 continue
-            entries = self._find_all(c.xml_node, TMPL_XPATH) or self._find_all(c.xml_node, NGFW_XPATH)
+            entries = []
+            if c.config_type == 'device-group':
+                entries = self._find_all(c.xml_node, DG_XPATH)
+            elif c.config_type == 'shared':
+                entries = self._find_all(c.xml_node, SHARED_XPATH)
+            else:
+                entries = self._find_all(c.xml_node, NGFW_XPATH)
 
-            columns = ['Name', 'Algorithm', 'Link Tags', 'Weights']
+            columns = ['Name', 'Distribution Method', 'Link Tags', 'Weights']
 
             def build_row(entry):
-                algo = ''
-                weights = ''
-                for method in ('best-available-path', 'top-down-priority', 'weighted-session-distribution'):
-                    if entry.find(method) is not None:
-                        algo = method
-                        # Try to get weights for weighted distribution
-                        if method == 'weighted-session-distribution':
-                            weight_entries = self._find_all(entry, f'{method}/member/entry')
-                            weights = ', '.join(
-                                f"{self._get_name(w)}={self._find_text(w, 'weight')}"
-                                for w in weight_entries
-                            )
-                        break
-                # Link tags
-                tags = self._find_all(entry, 'link-tag/member')
-                tag_list = ', '.join(t.text for t in tags if t.text) if tags else ''
-                return [self._get_name(entry), algo, tag_list, weights]
+                # Distribution method is a text element
+                method = self._find_text(entry, 'traffic-distribution')
+
+                # Link tags with optional weights
+                tag_entries = self._find_all(entry, 'link-tags/entry')
+                tags = []
+                weights = []
+                for t in tag_entries:
+                    tag_name = self._get_name(t)
+                    tags.append(tag_name)
+                    w = self._find_text(t, 'weight')
+                    if w:
+                        weights.append(f"{tag_name}={w}")
+
+                return [
+                    self._get_name(entry),
+                    method,
+                    ', '.join(tags),
+                    ', '.join(weights) if weights else '',
+                ]
 
             results.append(self._make_result(c.name, entries, columns, build_row))
         return results

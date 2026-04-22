@@ -2,8 +2,9 @@
 from .base import BaseParser, FeatureResult
 
 NGFW_XPATH = './/vsys/entry/rulebase/pbf/rules/entry'
-DG_PRE_XPATH = './/pre-rulebase/pbf/rules/entry'
-DG_POST_XPATH = './/post-rulebase/pbf/rules/entry'
+DG_PRE_XPATH = 'pre-rulebase/pbf/rules/entry'
+DG_POST_XPATH = 'post-rulebase/pbf/rules/entry'
+SHARED_PRE_XPATH = 'pre-rulebase/pbf/rules/entry'
 
 
 class PBFRulesParser(BaseParser):
@@ -13,10 +14,14 @@ class PBFRulesParser(BaseParser):
     def extract(self, xml_root, containers):
         results = []
         for c in containers:
+            if c.config_type in ('template', 'template-stack'):
+                continue
             entries = []
             if c.config_type == 'device-group':
                 entries = self._find_all(c.xml_node, DG_PRE_XPATH) + \
                           self._find_all(c.xml_node, DG_POST_XPATH)
+            elif c.config_type == 'shared':
+                entries = self._find_all(c.xml_node, SHARED_PRE_XPATH)
             else:
                 entries = self._find_all(c.xml_node, NGFW_XPATH)
 

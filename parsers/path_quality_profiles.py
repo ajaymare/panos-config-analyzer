@@ -1,8 +1,12 @@
 """Path Quality Profiles parser."""
 from .base import BaseParser, FeatureResult
 
-NGFW_XPATH = './/devices/entry/plugins/sd_wan/path-quality-profile/entry'
-TMPL_XPATH = './/template/entry/config/devices/entry/plugins/sd_wan/path-quality-profile/entry'
+# In device-groups: profiles/sdwan-path-quality/entry
+# In shared: profiles/sdwan-path-quality/entry
+DG_XPATH = 'profiles/sdwan-path-quality/entry'
+SHARED_XPATH = 'profiles/sdwan-path-quality/entry'
+# In NGFW (standalone): devices/entry/vsys/entry — unlikely but check
+NGFW_XPATH = './/vsys/entry/profiles/sdwan-path-quality/entry'
 
 
 class PathQualityProfilesParser(BaseParser):
@@ -12,28 +16,29 @@ class PathQualityProfilesParser(BaseParser):
     def extract(self, xml_root, containers):
         results = []
         for c in containers:
+            if c.config_type in ('template', 'template-stack'):
+                continue  # These profiles live in device-groups and shared, not templates
+            entries = []
             if c.config_type == 'device-group':
-                continue
-            entries = self._find_all(c.xml_node, TMPL_XPATH) or self._find_all(c.xml_node, NGFW_XPATH)
+                entries = self._find_all(c.xml_node, DG_XPATH)
+            elif c.config_type == 'shared':
+                entries = self._find_all(c.xml_node, SHARED_XPATH)
+            else:
+                entries = self._find_all(c.xml_node, NGFW_XPATH)
 
-            columns = ['Name', 'Latency (ms)', 'Jitter (ms)', 'Packet Loss (%)',
-                        'Traffic Class', 'Sensitivity']
+            columns = ['Name', 'Latency Threshold (ms)', 'Latency Sensitivity',
+                        'Jitter Threshold (ms)', 'Jitter Sensitivity',
+                        'Packet Loss Threshold (%)', 'Packet Loss Sensitivity']
 
             def build_row(entry):
-                # Path quality profiles have per-class thresholds
-                sla = entry.find('metric/sla')
-                latency = jitter = loss = ''
-                if sla is not None:
-                    latency = self._find_text(sla, 'latency')
-                    jitter = self._find_text(sla, 'jitter')
-                    loss = self._find_text(sla, 'packet-loss')
                 return [
                     self._get_name(entry),
-                    latency,
-                    jitter,
-                    loss,
-                    self._find_text(entry, 'traffic-class'),
-                    self._find_text(entry, 'sensitivity'),
+                    self._find_text(entry, 'metric/latency/threshold'),
+                    self._find_text(entry, 'metric/latency/sensitivity'),
+                    self._find_text(entry, 'metric/jitter/threshold'),
+                    self._find_text(entry, 'metric/jitter/sensitivity'),
+                    self._find_text(entry, 'metric/pkt-loss/threshold'),
+                    self._find_text(entry, 'metric/pkt-loss/sensitivity'),
                 ]
 
             results.append(self._make_result(c.name, entries, columns, build_row))

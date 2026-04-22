@@ -1,10 +1,9 @@
 """QoS Profiles parser."""
 from .base import BaseParser, FeatureResult
 
-QOS_PROF_XPATH = './/devices/entry/network/qos/profile/entry'
-QOS_INTF_XPATH = './/devices/entry/network/qos/interface/entry'
-TMPL_QOS_PROF = './/template/entry/config/devices/entry/network/qos/profile/entry'
-TMPL_QOS_INTF = './/template/entry/config/devices/entry/network/qos/interface/entry'
+# QoS is under network/ in templates and NGFW
+QOS_PROF_XPATH = './/network/qos/profile/entry'
+QOS_INTF_XPATH = './/network/qos/interface/entry'
 
 
 class QoSProfilesParser(BaseParser):
@@ -16,8 +15,8 @@ class QoSProfilesParser(BaseParser):
         for c in containers:
             if c.config_type == 'device-group':
                 continue
-            profiles = self._find_all(c.xml_node, TMPL_QOS_PROF) or self._find_all(c.xml_node, QOS_PROF_XPATH)
-            interfaces = self._find_all(c.xml_node, TMPL_QOS_INTF) or self._find_all(c.xml_node, QOS_INTF_XPATH)
+            profiles = self._find_all(c.xml_node, QOS_PROF_XPATH)
+            interfaces = self._find_all(c.xml_node, QOS_INTF_XPATH)
 
             columns = ['Name', 'Type', 'Max Bandwidth', 'Guaranteed', 'Priority', 'Classes']
 
