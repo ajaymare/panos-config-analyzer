@@ -33,6 +33,20 @@
                     <input type="file" name="config_files" accept=".xml,.txt" multiple required id="file-input">
                 </div>
                 <div class="file-list" id="file-list"></div>
+                <div class="mask-section">
+                    <div class="mask-header">
+                        <span class="mask-title">Mask Sensitive Information</span>
+                        <label class="mask-toggle"><input type="checkbox" id="mask-all-upload" onchange="toggleAllMask('upload')"> Select All</label>
+                    </div>
+                    <div class="mask-grid">
+                        <label><input type="checkbox" name="mask_categories" value="ip_addresses" class="mask-cb-upload"> IP Addresses</label>
+                        <label><input type="checkbox" name="mask_categories" value="hostnames" class="mask-cb-upload"> Hostnames &amp; FQDNs</label>
+                        <label><input type="checkbox" name="mask_categories" value="devices" class="mask-cb-upload"> Device Names &amp; Serials</label>
+                        <label><input type="checkbox" name="mask_categories" value="passwords" class="mask-cb-upload"> Passwords &amp; Keys</label>
+                        <label><input type="checkbox" name="mask_categories" value="certificates" class="mask-cb-upload"> Certificates</label>
+                        <label><input type="checkbox" name="mask_categories" value="network" class="mask-cb-upload"> Network Addresses</label>
+                    </div>
+                </div>
                 <p class="info-text">
                     Upload one or multiple configs. Multiple files produces a <strong>comparison report</strong>.<br>
                     <strong>Panorama:</strong> Device &rarr; Setup &rarr; Operations &rarr; Export named configuration snapshot<br>
@@ -60,6 +74,20 @@
                     <input type="checkbox" name="verify_ssl" id="verify_ssl">
                     <label for="verify_ssl">Verify SSL Certificate</label>
                 </div>
+                <div class="mask-section">
+                    <div class="mask-header">
+                        <span class="mask-title">Mask Sensitive Information</span>
+                        <label class="mask-toggle"><input type="checkbox" id="mask-all-api" onchange="toggleAllMask('api')"> Select All</label>
+                    </div>
+                    <div class="mask-grid">
+                        <label><input type="checkbox" name="mask_categories" value="ip_addresses" class="mask-cb-api"> IP Addresses</label>
+                        <label><input type="checkbox" name="mask_categories" value="hostnames" class="mask-cb-api"> Hostnames &amp; FQDNs</label>
+                        <label><input type="checkbox" name="mask_categories" value="devices" class="mask-cb-api"> Device Names &amp; Serials</label>
+                        <label><input type="checkbox" name="mask_categories" value="passwords" class="mask-cb-api"> Passwords &amp; Keys</label>
+                        <label><input type="checkbox" name="mask_categories" value="certificates" class="mask-cb-api"> Certificates</label>
+                        <label><input type="checkbox" name="mask_categories" value="network" class="mask-cb-api"> Network Addresses</label>
+                    </div>
+                </div>
                 <p class="info-text">
                     Generate an API key: <code>curl -k -X GET 'https://&lt;host&gt;/api/?type=keygen&amp;user=admin&amp;password=admin'</code>
                 </p>
@@ -81,6 +109,36 @@
 </div>
 
 <script>
+function toggleAllMask(tab) {
+    var allCb = document.getElementById('mask-all-' + tab);
+    var checkboxes = document.querySelectorAll('.mask-cb-' + tab);
+    for (var i = 0; i < checkboxes.length; i++) {
+        checkboxes[i].checked = allCb.checked;
+    }
+}
+
+function updateSelectAll(tab) {
+    var checkboxes = document.querySelectorAll('.mask-cb-' + tab);
+    var allCb = document.getElementById('mask-all-' + tab);
+    var allChecked = true;
+    for (var i = 0; i < checkboxes.length; i++) {
+        if (!checkboxes[i].checked) { allChecked = false; break; }
+    }
+    allCb.checked = allChecked;
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+    var tabs = ['upload', 'api'];
+    for (var t = 0; t < tabs.length; t++) {
+        var cbs = document.querySelectorAll('.mask-cb-' + tabs[t]);
+        for (var i = 0; i < cbs.length; i++) {
+            (function(tab) {
+                cbs[i].addEventListener('change', function() { updateSelectAll(tab); });
+            })(tabs[t]);
+        }
+    }
+});
+
 function switchTab(tab) {
     document.querySelectorAll('.tab').forEach(function(t) { t.classList.remove('active'); });
     document.querySelectorAll('.tab-content').forEach(function(c) { c.classList.remove('active'); });

@@ -7,6 +7,7 @@ from flask import Flask, render_template, request, send_file, jsonify
 import config as app_config
 from parsers import config_detector, registry
 from report import excel_generator
+from report.masker import mask_results
 from api_client import connector
 
 app = Flask(__name__)
@@ -77,6 +78,12 @@ def parse():
             if not configs_data:
                 return 'No valid files uploaded', 400
 
+            # Apply masking if requested
+            mask_categories = request.form.getlist('mask_categories')
+            if mask_categories:
+                for cfg in configs_data:
+                    cfg['results'] = mask_results(cfg['results'], mask_categories)
+
             if len(configs_data) == 1:
                 # Single file — use existing report
                 filepath = excel_generator.generate(
@@ -125,6 +132,11 @@ def parse():
                         summary=f'Parse error: {e}',
                         source='Error',
                     ))
+
+            # Apply masking if requested
+            mask_categories = request.form.getlist('mask_categories')
+            if mask_categories:
+                all_results = mask_results(all_results, mask_categories)
 
             filepath = excel_generator.generate(all_results, config_type)
         else:
