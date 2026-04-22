@@ -1,13 +1,14 @@
 # PAN-OS SD-WAN Configuration Parser
 
-Docker-based tool with a Flask web UI that parses Palo Alto Panorama/NGFW configurations and generates an Excel report of all SD-WAN features — enabled/disabled status with detailed configuration breakdowns.
+Docker-based tool with a Flask web UI that parses Palo Alto Panorama/NGFW configurations and generates an Excel report of all SD-WAN features — enabled/disabled status with detailed configuration breakdowns. Supports uploading multiple configs for side-by-side comparison analysis.
 
 ## Features
 
-- **Dual Input**: Upload XML config file or connect to a live device via PAN-OS API
+- **Multi-Config Comparison**: Upload multiple Panorama and NGFW configs to compare features side-by-side
+- **Single Config Analysis**: Upload one XML or connect to a live device via PAN-OS API
 - **Panorama + NGFW**: Automatically detects config type, enumerates templates, template-stacks, and device-groups
 - **14 SD-WAN Feature Parsers**: Comprehensive extraction of all SD-WAN related configuration
-- **Excel Report**: Summary sheet (Enabled/Disabled per feature) + detailed per-feature sheets with full config parameters
+- **Excel Reports**: Quick Reference summary, detailed per-feature sheets, and comparison views
 - **Dockerized**: Single container, no external dependencies
 
 ## SD-WAN Features Parsed
@@ -17,16 +18,16 @@ Docker-based tool with a Flask web UI that parses Palo Alto Panorama/NGFW config
 | SD-WAN Interface Profiles | Link type, tag, bandwidth, path monitoring |
 | Path Quality Profiles | SLA thresholds: latency, jitter, packet loss |
 | Traffic Distribution | Algorithms: best-available, top-down, weighted |
-| SD-WAN Policy Rules | App-ID based path selection, error correction |
+| SD-WAN Policy Rules | App-ID based path selection with traffic distribution |
 | VPN/IPSec Tunnels | IKE gateways, IPSec tunnels, crypto profiles |
-| VPN Clusters / Topology | Hub-spoke, full mesh topology definitions |
+| VPN Clusters / Topology | Cluster config, hub/branch devices, BGP, site info |
 | Routing (BGP/OSPF/ECMP) | Virtual routers, logical routers, VRFs, ECMP |
 | Policy-Based Forwarding | PBF rules with nexthop, monitoring |
 | QoS Profiles | QoS profiles and interface bindings |
-| Link Management | Link tags, ISP settings, monitoring probes |
-| SaaS Quality Monitoring | SaaS app probes, thresholds |
+| Link Management | SD-WAN link settings on interfaces, gateways |
+| SaaS Quality Monitoring | Adaptive/static monitoring, probe intervals |
 | Digital Experience Monitoring | DEM probes and autonomous DEM |
-| Zones & Interfaces | Zones, ethernet, tunnel interfaces |
+| Zones & Interfaces | Zones, ethernet, tunnel, aggregate, cellular interfaces |
 | Certificate Profiles | CA certs, CRL/OCSP settings |
 
 ## Quick Start
@@ -34,7 +35,7 @@ Docker-based tool with a Flask web UI that parses Palo Alto Panorama/NGFW config
 ### Docker Run
 
 ```bash
-docker run -d --name panos-parser -p 8080:8080 panos-sdwan-parser:latest
+docker run -d --name panos-parser -p 8080:8080 ajaymare/panos-config-analyzer:latest
 ```
 
 Open `http://localhost:8080` in your browser.
@@ -42,20 +43,28 @@ Open `http://localhost:8080` in your browser.
 ### Docker Build
 
 ```bash
-docker build -t panos-sdwan-parser:latest .
-docker run -d --name panos-parser -p 8080:8080 panos-sdwan-parser:latest
+docker build -t ajaymare/panos-config-analyzer:latest .
+docker run -d --name panos-parser -p 8080:8080 ajaymare/panos-config-analyzer:latest
 ```
 
 ## Usage
 
-### Upload XML Config
+### Single Config Analysis
 
 1. Export running config from Panorama or NGFW:
    - **GUI**: Device → Setup → Operations → Export named configuration snapshot
    - **CLI**: `show config running` → save to XML
 2. Open `http://localhost:8080`
-3. Select "Upload XML File" tab → choose your XML file → click "Parse Configuration"
+3. Select one XML file → click "Parse Configuration"
 4. Excel report downloads automatically
+
+### Multi-Config Comparison
+
+1. Export configs from multiple devices (Panorama + NGFWs)
+2. Open `http://localhost:8080`
+3. Select multiple XML files → click "Compare N Configurations"
+4. Comparison report downloads with side-by-side feature analysis
+5. Use the X button to remove individual files before submitting
 
 ### Connect via API
 
@@ -69,14 +78,21 @@ docker run -d --name panos-parser -p 8080:8080 panos-sdwan-parser:latest
 
 ## Excel Report Format
 
-- **Summary Sheet**: All 14 features listed with Enabled/Disabled status, summary count, and source (NGFW / template name / device-group name)
-- **Detail Sheets**: One sheet per feature with full configuration columns, auto-filter, and formatted cells
+### Single Config Report
+- **Quick Reference**: All 14 features grouped by category with Enabled/Disabled status, color-coded headers
+- **Detail Sheets**: One sheet per feature with full configuration data, auto-filter, and Source column
+- **All Features**: Split into Enabled and Disabled sections with counts
+
+### Multi-Config Comparison Report
+- **Comparison Summary**: Features as rows, each config gets Status + Summary columns side-by-side with green/red color coding and per-config totals
+- **Detail Sheets**: All data from all configs merged per feature with Config File and Source columns
+- **All Features**: Enabled/Disabled split across all configs with Config File column
 
 ## Project Structure
 
 ```
 parser/
-├── app.py                  # Flask routes
+├── app.py                  # Flask routes (single + multi-file)
 ├── config.py               # App configuration
 ├── requirements.txt        # Python dependencies
 ├── Dockerfile
@@ -88,10 +104,10 @@ parser/
 ├── api_client/
 │   └── connector.py        # pan-os-python SDK wrapper
 ├── report/
-│   ├── excel_generator.py  # openpyxl workbook builder
+│   ├── excel_generator.py  # Single + comparison report generation
 │   └── styles.py           # Cell formatting
 ├── templates/
-│   └── index.html          # Web UI
+│   └── index.html          # Web UI with multi-file upload
 └── static/
     └── style.css
 ```
