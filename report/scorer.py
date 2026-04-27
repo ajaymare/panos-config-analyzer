@@ -41,20 +41,30 @@ def score_config(results):
         results: list of FeatureResult objects for one config
 
     Returns:
-        dict with: score, total, level, level_color, category_scores, missing_features, recommendations
+        dict with: score, total, level, level_color, category_scores,
+                   enabled_features, missing_features, panorama_managed_features,
+                   recommendations
     """
     # Aggregate: feature is enabled if ANY result for that feature is enabled
-    feature_status = {}
+    feature_status = {}  # True = enabled, False = disabled
+    panorama_managed = set()  # Features marked as Panorama-Managed
     for r in results:
         if r.feature_name not in feature_status:
             feature_status[r.feature_name] = False
         if r.enabled:
             feature_status[r.feature_name] = True
+        elif r.summary == 'Panorama-Managed':
+            panorama_managed.add(r.feature_name)
 
     # Count enabled features (only those in our known list)
     enabled_features = [f for f in ALL_FEATURES if feature_status.get(f, False)]
-    missing_features = [f for f in ALL_FEATURES if not feature_status.get(f, False)]
-    score = len(enabled_features)
+    panorama_managed_features = [f for f in ALL_FEATURES
+                                  if f in panorama_managed and not feature_status.get(f, False)]
+    missing_features = [f for f in ALL_FEATURES
+                        if not feature_status.get(f, False) and f not in panorama_managed]
+
+    # Score includes both enabled and panorama-managed (they ARE configured)
+    score = len(enabled_features) + len(panorama_managed_features)
 
     # Determine level
     level = 'Basic'
@@ -68,7 +78,8 @@ def score_config(results):
     # Per-category breakdown
     category_scores = {}
     for cat_name, feats in FEATURE_CATEGORIES.items():
-        enabled = sum(1 for f in feats if feature_status.get(f, False))
+        enabled = sum(1 for f in feats
+                      if feature_status.get(f, False) or f in panorama_managed)
         category_scores[cat_name] = {
             'enabled': enabled,
             'total': len(feats),
@@ -76,7 +87,7 @@ def score_config(results):
             'features': {f: feature_status.get(f, False) for f in feats},
         }
 
-    # Recommendations for missing features
+    # Recommendations only for truly missing features (not Panorama-managed)
     recs = [RECOMMENDATIONS.get(f, f'Configure {f}') for f in missing_features]
 
     return {
@@ -86,6 +97,7 @@ def score_config(results):
         'level': level,
         'level_color': level_color,
         'enabled_features': enabled_features,
+        'panorama_managed_features': panorama_managed_features,
         'missing_features': missing_features,
         'category_scores': category_scores,
         'recommendations': recs,
@@ -113,12 +125,18 @@ def score_configs(configs_data):
 
     # Add comparison data if multiple configs
     if len(scored) > 1:
-        all_enabled_sets = [set(s['scoring']['enabled_features']) for s in scored]
+        all_enabled_sets = [
+            set(s['scoring']['enabled_features']) | set(s['scoring']['panorama_managed_features'])
+            for s in scored
+        ]
         common = set.intersection(*all_enabled_sets)
         for i, s in enumerate(scored):
             others = [all_enabled_sets[j] for j in range(len(scored)) if j != i]
             others_union = set.union(*others) if others else set()
-            s['scoring']['unique_features'] = list(set(s['scoring']['enabled_features']) - others_union)
+            s['scoring']['unique_features'] = list(
+                (set(s['scoring']['enabled_features']) | set(s['scoring']['panorama_managed_features']))
+                - others_union
+            )
         scored[0]['common_features'] = list(common)
 
     return scored

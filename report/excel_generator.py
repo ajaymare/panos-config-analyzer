@@ -154,6 +154,22 @@ def _add_executive_summary(wb, scored_list, is_first_sheet=True):
 
         row += 1
 
+        # Panorama-Managed features
+        pan_managed = sc.get('panorama_managed_features', [])
+        if pan_managed:
+            ws.cell(row=row, column=1, value='Panorama-Managed Features')
+            ws.cell(row=row, column=1).font = Font(name='Calibri', size=11, bold=True, color='B9770E')
+            row += 1
+            for feat in pan_managed:
+                ws.cell(row=row, column=1, value=f'  {feat}')
+                ws.cell(row=row, column=1).font = Font(name='Calibri', size=11, color='B9770E')
+                ws.cell(row=row, column=1).border = styles.thin_border
+                ws.cell(row=row, column=2, value='Configured via Panorama')
+                ws.cell(row=row, column=2).font = Font(name='Calibri', size=11, color='B9770E')
+                ws.cell(row=row, column=2).border = styles.thin_border
+                row += 1
+            row += 1
+
         # Missing features / recommendations
         if sc['missing_features']:
             ws.cell(row=row, column=1, value='Recommendations')
@@ -171,7 +187,7 @@ def _add_executive_summary(wb, scored_list, is_first_sheet=True):
                 ws.cell(row=row, column=2, value=rec)
                 styles.style_data_cell(ws.cell(row=row, column=2), row)
                 row += 1
-        else:
+        elif not pan_managed:
             ws.cell(row=row, column=1, value='All SD-WAN features are configured.')
             ws.cell(row=row, column=1).font = Font(name='Calibri', size=11, bold=True, color='1E8449')
             row += 1

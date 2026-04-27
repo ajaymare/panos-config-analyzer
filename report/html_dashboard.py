@@ -28,6 +28,7 @@ def _score_card_html(cfg_name, cfg_type, scoring, versions=None):
     score = scoring['score']
     total = scoring['total']
     missing_count = len(scoring['missing_features'])
+    pan_managed_count = len(scoring.get('panorama_managed_features', []))
 
     # Version info
     version_html = ''
@@ -62,6 +63,7 @@ def _score_card_html(cfg_name, cfg_type, scoring, versions=None):
       {circle}
       <div class="score-details">
         <div class="score-stat enabled">{score} Enabled</div>
+        {'<div class="score-stat panorama-managed">' + str(pan_managed_count) + ' Panorama</div>' if pan_managed_count else ''}
         <div class="score-stat disabled">{missing_count} Missing</div>
       </div>
     </div>'''
@@ -81,8 +83,11 @@ def _comparison_table_html(scored_configs):
             cells = ''
             for s in scored_configs:
                 enabled = feat in s['scoring']['enabled_features']
+                pan_managed = feat in s['scoring'].get('panorama_managed_features', [])
                 if enabled:
                     cells += '<td class="status-cell enabled">&#10003;</td>'
+                elif pan_managed:
+                    cells += '<td class="status-cell panorama-managed" title="Configured via Panorama">&#9670;</td>'
                 else:
                     cells += '<td class="status-cell disabled">&#10007;</td>'
             rows += f'<tr><td class="feat-name">{_esc(feat)}</td>{cells}</tr>\n'
@@ -202,6 +207,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
   padding: 12px; border-top: 1px solid #e8ecf0; margin-top: 12px; }
 .score-stat { font-size: 12px; font-weight: 600; }
 .score-stat.enabled { color: #1E8449; }
+.score-stat.panorama-managed { color: #B9770E; }
 .score-stat.disabled { color: #C0392B; }
 
 /* Comparison Table */
@@ -216,6 +222,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
 .feat-name { color: #1e2a3a; }
 .status-cell { text-align: center; font-size: 16px; font-weight: 700; }
 .status-cell.enabled { color: #1E8449; }
+.status-cell.panorama-managed { color: #B9770E; }
 .status-cell.disabled { color: #C0392B; }
 .totals-row td { background: #f7f9fc; border-top: 2px solid #d4dbe6; }
 .total-cell { text-align: center; }

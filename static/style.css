@@ -198,6 +198,7 @@ body {
 }
 .dashboard-results .score-stat { font-size: 12px; font-weight: 600; }
 .dashboard-results .score-stat.enabled { color: #1E8449; }
+.dashboard-results .score-stat.panorama-managed { color: #B9770E; }
 .dashboard-results .score-stat.disabled { color: #C0392B; }
 
 /* Comparison Table */
@@ -217,6 +218,7 @@ body {
 .dashboard-results .feat-name { color: var(--text-primary); }
 .dashboard-results .status-cell { text-align: center; font-size: 16px; font-weight: 700; }
 .dashboard-results .status-cell.enabled { color: #1E8449; }
+.dashboard-results .status-cell.panorama-managed { color: #B9770E; }
 .dashboard-results .status-cell.disabled { color: #C0392B; }
 .dashboard-results .totals-row td { background: #f7f9fc; border-top: 2px solid var(--border); }
 .dashboard-results .total-cell { text-align: center; }

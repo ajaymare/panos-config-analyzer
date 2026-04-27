@@ -93,3 +93,38 @@ def get_config_type(xml_root: ET.Element) -> str:
     if dg is not None or tmpl is not None:
         return 'panorama'
     return 'ngfw'
+
+
+def is_panorama_managed(xml_root: ET.Element) -> bool:
+    """Check if an NGFW config is managed by Panorama."""
+    panorama_server = xml_root.find(
+        f'{_DEV}/deviceconfig/system/panorama/local-panorama/panorama-server'
+    )
+    return panorama_server is not None
+
+
+def get_device_serial(xml_root: ET.Element) -> str:
+    """Extract the device serial number from an NGFW config.
+
+    Checks mgt-config/devices/entry for serial-like names (numeric, 12+ digits).
+    """
+    mgt_devices = xml_root.findall('mgt-config/devices/entry')
+    for entry in mgt_devices:
+        name = entry.get('name', '')
+        if name.isdigit() and len(name) >= 12:
+            return name
+    return ''
+
+
+def get_managed_serials(xml_root: ET.Element) -> set:
+    """Extract all managed device serial numbers from a Panorama config.
+
+    Looks in plugins/sd_wan/devices/entry for SD-WAN managed devices.
+    """
+    serials = set()
+    for path in [f'{_DEV}/plugins/sd_wan/devices/entry', 'plugins/sd_wan/devices/entry']:
+        for entry in (xml_root.findall(path) or []):
+            name = entry.get('name', '')
+            if name.isdigit() and len(name) >= 12:
+                serials.add(name)
+    return serials
