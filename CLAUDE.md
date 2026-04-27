@@ -2,18 +2,20 @@
 
 ## Project Overview
 
-PAN-OS SD-WAN Configuration Parser — a Docker-based Flask tool that parses Palo Alto Panorama/NGFW XML configs (file upload or live API) and generates Excel reports of all SD-WAN features. Supports multi-config comparison analysis.
+PAN-OS SD-WAN Configuration Parser — a Docker-based Flask tool that parses Palo Alto Panorama/NGFW XML configs (file upload or live API) and generates Excel + HTML dashboard reports with deployment scoring, gap analysis, and multi-config comparison. Output is a ZIP containing both reports.
 
 ## Architecture
 
-- **Flask app** (`app.py`): Routes for single/multi-file upload and API input, orchestrates parsing pipeline, returns Excel download
+- **Flask app** (`app.py`): Routes for single/multi-file upload and API input, orchestrates parsing pipeline, returns ZIP (Excel + HTML)
 - **Parsers** (`parsers/`): 14 feature-specific modules, each a `BaseParser` subclass with `extract()` method
 - **Config Detector** (`parsers/config_detector.py`): Auto-detects Panorama vs NGFW, enumerates templates/device-groups/shared
 - **Registry** (`parsers/registry.py`): Auto-discovers all `BaseParser` subclasses via `pkgutil`
 - **API Client** (`api_client/connector.py`): pan-os-python SDK wrapper for live device config retrieval
-- **Report** (`report/excel_generator.py`): Two report modes:
-  - `generate()` — Single config: Quick Reference + detail sheets + All Features
-  - `generate_comparison()` — Multi config: Comparison Summary (side-by-side) + merged detail sheets + All Features
+- **Report** (`report/excel_generator.py`): Two report modes, both with Executive Summary sheet:
+  - `generate()` — Single config: Executive Summary + Quick Reference + detail sheets + All Features
+  - `generate_comparison()` — Multi config: Executive Summary + Comparison Summary + merged detail sheets + All Features
+- **HTML Dashboard** (`report/html_dashboard.py`): Self-contained HTML with scorecards, comparison table, category charts, gap analysis
+- **Scorer** (`report/scorer.py`): Deployment maturity scoring (Basic/Advanced/Full) with category breakdowns and recommendations
 - **Masker** (`report/masker.py`): Sensitive data masking with 6 categories (IPs, hostnames, devices, passwords, certs, network addresses)
 
 ## Key Files
@@ -21,7 +23,9 @@ PAN-OS SD-WAN Configuration Parser — a Docker-based Flask tool that parses Pal
 - `app.py` — Flask entry point, `/parse` handles both single and multi-file uploads
 - `parsers/base.py` — `BaseParser` ABC, `FeatureResult` and `ConfigContainer` dataclasses, shared XML helpers
 - `parsers/config_detector.py` — Panorama/NGFW detection, container enumeration (templates, device-groups, shared)
-- `report/excel_generator.py` — Single report + comparison report builders with category grouping
+- `report/excel_generator.py` — Single report + comparison report builders with Executive Summary and category grouping
+- `report/html_dashboard.py` — Self-contained HTML dashboard (inline CSS, no external deps, works offline)
+- `report/scorer.py` — Deployment scoring: `score_config()` and `score_configs()` for maturity grading
 - `report/masker.py` — Sensitive data masking engine (IP, hostname, device, password, cert, network categories)
 - `report/styles.py` — openpyxl cell styles (header, data, status fills, auto-width)
 - `templates/index.html` — Web UI with multi-file upload, file list with remove buttons
@@ -68,6 +72,14 @@ Config detector creates containers per scope:
 - `ngfw` — xml_node points to root `config` element
 
 Parsers iterate containers and search relative XPaths. Some parsers (VPN topology) use `xml_root` directly for plugins section.
+
+### Deployment Scoring & Dashboard
+- `report/scorer.py` scores configs by counting enabled features out of 14: Basic (1-4), Advanced (5-9), Full (10-14)
+- Per-category breakdown (SD-WAN Core, VPN & Topology, Routing, Monitoring, Network Infrastructure)
+- Missing features generate actionable recommendations (defined in `RECOMMENDATIONS` dict)
+- `report/html_dashboard.py` generates a self-contained HTML file with inline CSS (no JS libs)
+- Dashboard sections: scorecards with circular progress, feature comparison table, category bar charts, gap analysis
+- `app.py` bundles Excel + HTML into a ZIP via `_create_zip()` before returning to the client
 
 ### Sensitive Data Masking
 - `report/masker.py` applies masking to `FeatureResult` objects before report generation

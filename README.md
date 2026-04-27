@@ -1,6 +1,6 @@
 # PAN-OS SD-WAN Configuration Parser
 
-Docker-based tool with a Flask web UI that parses Palo Alto Panorama/NGFW configurations and generates an Excel report of all SD-WAN features — enabled/disabled status with detailed configuration breakdowns. Supports uploading multiple configs for side-by-side comparison analysis.
+Docker-based tool with a Flask web UI that parses Palo Alto Panorama/NGFW configurations and generates Excel + HTML dashboard reports of all SD-WAN features — with deployment maturity scoring, gap analysis, and side-by-side comparison. Designed for SEs, PMs, and network engineers.
 
 ## Features
 
@@ -8,7 +8,9 @@ Docker-based tool with a Flask web UI that parses Palo Alto Panorama/NGFW config
 - **Single Config Analysis**: Upload one XML or connect to a live device via PAN-OS API
 - **Panorama + NGFW**: Automatically detects config type, enumerates templates, template-stacks, and device-groups
 - **14 SD-WAN Feature Parsers**: Comprehensive extraction of all SD-WAN related configuration
-- **Excel Reports**: Quick Reference summary, detailed per-feature sheets, and comparison views
+- **HTML Dashboard**: Visual scorecards, deployment maturity scoring (Basic/Advanced/Full), category bar charts, and gap analysis
+- **Deployment Scoring**: Automatic maturity grading based on enabled features (Basic: 1-4, Advanced: 5-9, Full: 10-14)
+- **Excel Reports**: Executive Summary with scoring + Quick Reference + detailed per-feature sheets + comparison views
 - **Sensitive Data Masking**: Selectively mask IPs, hostnames, device names, passwords, certificates, and network addresses
 - **HTTPS Support**: Self-signed certificate with nginx reverse proxy on port 9443
 - **Dockerized**: Single container, no external dependencies
@@ -57,15 +59,15 @@ docker run -d --name panos-parser -p 8080:8080 -p 9443:9443 ajaymare/panos-confi
    - **GUI**: Device → Setup → Operations → Export named configuration snapshot
    - **CLI**: `show config running` → save to XML
 2. Open `http://localhost:8080`
-3. Select one XML file → click "Parse Configuration"
-4. Excel report downloads automatically
+3. Select one XML file → click "Generate Report"
+4. ZIP file downloads containing Excel report + HTML dashboard
 
 ### Multi-Config Comparison
 
 1. Export configs from multiple devices (Panorama + NGFWs)
 2. Open `http://localhost:8080`
 3. Select multiple XML files → click "Compare N Configurations"
-4. Comparison report downloads with side-by-side feature analysis
+4. ZIP file downloads with comparison Excel + HTML dashboard with side-by-side scoring
 5. Use the X button to remove individual files before submitting
 
 ### Mask Sensitive Information
@@ -88,19 +90,31 @@ Use "Select All" to enable all categories, or pick individual ones.
    ```
 2. Open `http://localhost:8080`
 3. Select "Connect via API" tab → enter hostname and API key → click "Connect & Parse"
-4. Excel report downloads automatically
+4. ZIP file downloads containing Excel report + HTML dashboard
 
-## Excel Report Format
+## Report Output
 
-### Single Config Report
-- **Quick Reference**: All 14 features grouped by category with Enabled/Disabled status, color-coded headers
-- **Detail Sheets**: One sheet per feature with full configuration data, auto-filter, and Source column
+The tool generates a ZIP file containing both an Excel report and an HTML dashboard.
+
+### HTML Dashboard
+- **Deployment Scorecards**: Per-config cards with maturity level (Basic/Advanced/Full), circular progress indicator, enabled/missing counts
+- **Feature Comparison Table**: All 14 features grouped by category with green checkmark / red X per config
+- **Category Bar Charts**: Horizontal bars showing coverage percentage per category per config
+- **Gap Analysis**: Missing features with actionable recommendations for each config
+
+### Excel Report
+
+#### Single Config
+- **Executive Summary**: Deployment maturity score, category breakdown with coverage %, recommendations
+- **Quick Reference**: All 14 features grouped by category with Enabled/Disabled status
+- **Detail Sheets**: One sheet per feature with full configuration data
 - **All Features**: Split into Enabled and Disabled sections with counts
 
-### Multi-Config Comparison Report
-- **Comparison Summary**: Features as rows, each config gets Status + Summary columns side-by-side with green/red color coding and per-config totals
-- **Detail Sheets**: All data from all configs merged per feature with Config File and Source columns
-- **All Features**: Enabled/Disabled split across all configs with Config File column
+#### Multi-Config Comparison
+- **Executive Summary**: Side-by-side deployment scoring across all configs
+- **Comparison Summary**: Features as rows, per-config Status + Summary columns
+- **Detail Sheets**: Merged data from all configs per feature
+- **All Features**: Enabled/Disabled split across all configs
 
 ## Project Structure
 
@@ -121,6 +135,8 @@ parser/
 │   └── connector.py        # pan-os-python SDK wrapper
 ├── report/
 │   ├── excel_generator.py  # Single + comparison report generation
+│   ├── html_dashboard.py   # Self-contained HTML dashboard generator
+│   ├── scorer.py           # Deployment maturity scoring engine
 │   ├── masker.py           # Sensitive data masking engine
 │   └── styles.py           # Cell formatting
 ├── templates/
