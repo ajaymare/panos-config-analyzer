@@ -86,6 +86,22 @@ def _add_executive_summary(wb, scored_list, is_first_sheet=True):
         ws.cell(row=row, column=1, value=f'{name} ({cfg_type.upper()})')
         row += 1
 
+        # Software version info
+        versions = s.get('versions')
+        if versions:
+            version_parts = []
+            if versions.get('panos_version'):
+                version_parts.append(f'PAN-OS {versions["panos_version"]}')
+            if versions.get('sdwan_version'):
+                version_parts.append(f'SD-WAN Plugin {versions["sdwan_version"]}')
+            if version_parts:
+                ws.cell(row=row, column=1, value='Software Version')
+                ws.cell(row=row, column=1).font = Font(name='Calibri', size=11, bold=True)
+                ws.cell(row=row, column=2, value=' | '.join(version_parts))
+                ws.cell(row=row, column=2).font = Font(name='Calibri', size=11, color='0066CC')
+                ws.cell(row=row, column=2).border = styles.thin_border
+                row += 1
+
         # Score and level
         level_colors = {'Full': '1E8449', 'Advanced': 'B9770E', 'Basic': '2E86C1'}
         level_color = level_colors.get(sc['level'], '2E86C1')
@@ -166,13 +182,13 @@ def _add_executive_summary(wb, scored_list, is_first_sheet=True):
     ws.freeze_panes = 'A4'
 
 
-def generate(results: list, config_type: str = 'unknown') -> str:
+def generate(results: list, config_type: str = 'unknown', versions: dict = None, output_dir: str = None) -> str:
     wb = Workbook()
 
     # ── Executive Summary Sheet ──
     from .scorer import score_config
     scoring = score_config(results)
-    _add_executive_summary(wb, [{'filename': 'Config', 'config_type': config_type, 'scoring': scoring}])
+    _add_executive_summary(wb, [{'filename': 'Config', 'config_type': config_type, 'scoring': scoring, 'versions': versions}])
 
     # ── Quick Reference Sheet ──
     ws = wb.create_sheet(title='Quick Reference')
@@ -428,7 +444,8 @@ def generate(results: list, config_type: str = 'unknown') -> str:
 
     # Save
     filename = f'sdwan_report_{datetime.now().strftime("%Y%m%d_%H%M%S")}_{uuid.uuid4().hex[:6]}.xlsx'
-    filepath = os.path.join(REPORT_DIR, filename)
+    out = output_dir or REPORT_DIR
+    filepath = os.path.join(out, filename)
     wb.save(filepath)
     return filepath
 
@@ -454,7 +471,7 @@ def _aggregate_feature(results_list, feature_name):
     return enabled, combined
 
 
-def generate_comparison(configs_data: list) -> str:
+def generate_comparison(configs_data: list, output_dir: str = None) -> str:
     """Generate a comparison Excel report from multiple config files.
 
     Args:
@@ -686,6 +703,7 @@ def generate_comparison(configs_data: list) -> str:
 
     # Save
     filename = f'sdwan_comparison_{datetime.now().strftime("%Y%m%d_%H%M%S")}_{uuid.uuid4().hex[:6]}.xlsx'
-    filepath = os.path.join(REPORT_DIR, filename)
+    out = output_dir or REPORT_DIR
+    filepath = os.path.join(out, filename)
     wb.save(filepath)
     return filepath

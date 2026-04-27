@@ -178,7 +178,10 @@ body {
     font-size: 14px; margin: 12px 0 2px; padding: 0 12px;
     white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
-.dashboard-results .config-type { font-size: 11px; color: var(--text-secondary); margin-bottom: 8px; }
+.dashboard-results .config-type { font-size: 11px; color: var(--text-secondary); margin-bottom: 4px; }
+.dashboard-results .config-version {
+    font-size: 10px; color: var(--accent); margin-bottom: 8px; font-weight: 600;
+}
 .dashboard-results .score-circle { width: 90px; height: 90px; margin: 0 auto; position: relative; }
 .dashboard-results .score-circle svg { width: 100%; height: 100%; transform: rotate(-90deg); }
 .dashboard-results .score-circle .bg { fill: none; stroke: #e8ecf0; stroke-width: 3; }

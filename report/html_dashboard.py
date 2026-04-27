@@ -20,7 +20,7 @@ def _cat_color_css(hex_color):
     return f'#{hex_color}'
 
 
-def _score_card_html(cfg_name, cfg_type, scoring):
+def _score_card_html(cfg_name, cfg_type, scoring, versions=None):
     """Render a single config scorecard."""
     pct = scoring['percent']
     level = scoring['level']
@@ -28,6 +28,17 @@ def _score_card_html(cfg_name, cfg_type, scoring):
     score = scoring['score']
     total = scoring['total']
     missing_count = len(scoring['missing_features'])
+
+    # Version info
+    version_html = ''
+    if versions:
+        parts = []
+        if versions.get('panos_version'):
+            parts.append(f'PAN-OS {_esc(versions["panos_version"])}')
+        if versions.get('sdwan_version'):
+            parts.append(f'SD-WAN Plugin {_esc(versions["sdwan_version"])}')
+        if parts:
+            version_html = f'<div class="config-version">{" | ".join(parts)}</div>'
 
     # CSS-only circular progress
     circle = f'''
@@ -47,6 +58,7 @@ def _score_card_html(cfg_name, cfg_type, scoring):
       </div>
       <h3 class="config-name">{_esc(cfg_name)}</h3>
       <div class="config-type">{_esc(cfg_type.upper())}</div>
+      {version_html}
       {circle}
       <div class="score-details">
         <div class="score-stat enabled">{score} Enabled</div>
@@ -177,7 +189,8 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
   letter-spacing: 1px; }
 .config-name { font-size: 14px; margin: 12px 0 2px; padding: 0 12px;
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.config-type { font-size: 11px; color: #6b7a8d; margin-bottom: 8px; }
+.config-type { font-size: 11px; color: #6b7a8d; margin-bottom: 4px; }
+.config-version { font-size: 10px; color: #0066cc; margin-bottom: 8px; font-weight: 600; }
 .score-circle { width: 90px; height: 90px; margin: 0 auto; position: relative; }
 .score-circle svg { width: 100%; height: 100%; transform: rotate(-90deg); }
 .score-circle .bg { fill: none; stroke: #e8ecf0; stroke-width: 3; }
@@ -259,7 +272,8 @@ def generate_dashboard_fragment(configs_data):
     is_comparison = len(scored) > 1
 
     cards = ''.join(
-        _score_card_html(s['filename'], s['config_type'], s['scoring'])
+        _score_card_html(s['filename'], s['config_type'], s['scoring'],
+                         versions=s.get('versions'))
         for s in scored
     )
     table = _comparison_table_html(scored)
@@ -319,7 +333,8 @@ def generate_dashboard(configs_data):
 
     # Scorecards
     cards = ''.join(
-        _score_card_html(s['filename'], s['config_type'], s['scoring'])
+        _score_card_html(s['filename'], s['config_type'], s['scoring'],
+                         versions=s.get('versions'))
         for s in scored
     )
 

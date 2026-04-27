@@ -108,6 +108,7 @@ def score_configs(configs_data):
             'filename': cfg['filename'],
             'config_type': cfg['config_type'],
             'scoring': scoring,
+            'versions': cfg.get('versions'),
         })
 
     # Add comparison data if multiple configs

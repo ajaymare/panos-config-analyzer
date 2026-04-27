@@ -15,14 +15,39 @@ from api_client import connector
 app = Flask(__name__)
 app.config['MAX_CONTENT_LENGTH'] = app_config.MAX_CONTENT_LENGTH
 
-# In-memory map of download IDs to file paths
-_download_files = {}
-
 
 @app.route('/')
 def index():
     error = request.args.get('error')
     return render_template('index.html', error=error)
+
+
+def _extract_versions(xml_root):
+    """Extract PAN-OS and SD-WAN plugin versions from XML config."""
+    panos_version = xml_root.get('version', '')
+    detail_version = xml_root.get('detail-version', '')
+
+    # SD-WAN plugin version: plugins/sd_wan/@version
+    sdwan_version = ''
+    for path in ['devices/entry/plugins/sd_wan', 'plugins/sd_wan']:
+        node = xml_root.find(path)
+        if node is not None:
+            sdwan_version = node.get('version', '')
+            break
+
+    return {
+        'panos_version': panos_version,
+        'detail_version': detail_version,
+        'sdwan_version': sdwan_version,
+    }
+
+
+def _make_session_dir():
+    """Create a unique per-request directory for report files."""
+    session_id = uuid.uuid4().hex[:12]
+    session_dir = os.path.join(app_config.REPORT_DIR, session_id)
+    os.makedirs(session_dir, exist_ok=True)
+    return session_id, session_dir
 
 
 def _parse_single_xml(file_stream, filename):
@@ -35,6 +60,7 @@ def _parse_single_xml(file_stream, filename):
 
     config_type = config_detector.get_config_type(xml_root)
     containers = config_detector.detect(xml_root)
+    versions = _extract_versions(xml_root)
 
     if not containers:
         raise ValueError(f'No configuration containers found in {filename}')
@@ -59,6 +85,7 @@ def _parse_single_xml(file_stream, filename):
         'filename': filename,
         'config_type': config_type,
         'results': all_results,
+        'versions': versions,
     }
 
 
@@ -67,6 +94,9 @@ def parse():
     method = request.form.get('method', 'upload')
 
     try:
+        # Create isolated session directory for this request
+        session_id, session_dir = _make_session_dir()
+
         if method == 'upload':
             files = request.files.getlist('config_files')
             if not files or all(f.filename == '' for f in files):
@@ -93,9 +123,13 @@ def parse():
                 excel_path = excel_generator.generate(
                     configs_data[0]['results'],
                     configs_data[0]['config_type'],
+                    versions=configs_data[0].get('versions'),
+                    output_dir=session_dir,
                 )
             else:
-                excel_path = excel_generator.generate_comparison(configs_data)
+                excel_path = excel_generator.generate_comparison(
+                    configs_data, output_dir=session_dir,
+                )
 
         elif method == 'api':
             hostname = request.form.get('hostname', '').strip()
@@ -116,6 +150,7 @@ def parse():
             if config_type == 'unknown':
                 config_type = config_detector.get_config_type(xml_root)
             containers = config_detector.detect(xml_root)
+            versions = _extract_versions(xml_root)
 
             if not containers:
                 return jsonify({'error': 'No configuration containers found in XML'}), 400
@@ -141,11 +176,14 @@ def parse():
             if mask_categories:
                 all_results = mask_results(all_results, mask_categories)
 
-            excel_path = excel_generator.generate(all_results, config_type)
+            excel_path = excel_generator.generate(
+                all_results, config_type, versions=versions, output_dir=session_dir,
+            )
             configs_data = [{
                 'filename': hostname,
                 'config_type': config_type,
                 'results': all_results,
+                'versions': versions,
             }]
         else:
             return jsonify({'error': 'Invalid method'}), 400
@@ -153,14 +191,12 @@ def parse():
         # Generate dashboard HTML fragment
         dashboard_html = generate_dashboard_fragment(configs_data)
 
-        # Store Excel file for download with unique ID
-        file_id = uuid.uuid4().hex[:12]
-        _download_files[file_id] = excel_path
-
+        # Return JSON with dashboard HTML and scoped Excel download URL
+        excel_filename = os.path.basename(excel_path)
         return jsonify({
             'dashboard_html': dashboard_html,
-            'excel_url': f'/download/{file_id}',
-            'excel_filename': os.path.basename(excel_path),
+            'excel_url': f'/download/{session_id}/{excel_filename}',
+            'excel_filename': excel_filename,
         })
 
     except ValueError as e:
@@ -169,20 +205,21 @@ def parse():
         return jsonify({'error': f'Unexpected error: {e}'}), 500
 
 
-@app.route('/download/<file_id>')
-def download(file_id):
-    """Serve an Excel report file for download."""
-    filepath = _download_files.get(file_id)
-    if not filepath or not os.path.exists(filepath):
-        return 'File not found', 404
+@app.route('/download/<session_id>/<filename>')
+def download(session_id, filename):
+    """Serve an Excel report file scoped to a session directory."""
+    # Prevent path traversal
+    if '..' in session_id or '..' in filename or '/' in session_id:
+        return 'Invalid request', 400
 
-    # Clean up the mapping after download
-    _download_files.pop(file_id, None)
+    filepath = os.path.join(app_config.REPORT_DIR, session_id, filename)
+    if not os.path.exists(filepath):
+        return 'File not found or expired', 404
 
     return send_file(
         filepath,
         as_attachment=True,
-        download_name=os.path.basename(filepath),
+        download_name=filename,
         mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
     )
 
