@@ -1,5 +1,6 @@
 """PAN-OS SD-WAN Configuration Parser — Flask App."""
 import os
+import zipfile
 import xml.etree.ElementTree as ET
 
 from flask import Flask, render_template, request, send_file, jsonify
@@ -7,6 +8,7 @@ from flask import Flask, render_template, request, send_file, jsonify
 import config as app_config
 from parsers import config_detector, registry
 from report import excel_generator
+from report.html_dashboard import generate_dashboard
 from report.masker import mask_results
 from api_client import connector
 
@@ -18,6 +20,18 @@ app.config['MAX_CONTENT_LENGTH'] = app_config.MAX_CONTENT_LENGTH
 def index():
     error = request.args.get('error')
     return render_template('index.html', error=error)
+
+
+def _create_zip(excel_path, html_path):
+    """Bundle Excel and HTML dashboard into a ZIP file."""
+    zip_name = os.path.basename(excel_path).replace('.xlsx', '.zip')
+    zip_path = os.path.join(app_config.REPORT_DIR, zip_name)
+    with zipfile.ZipFile(zip_path, 'w', zipfile.ZIP_DEFLATED) as zf:
+        zf.write(excel_path, os.path.basename(excel_path))
+        zf.write(html_path, os.path.basename(html_path))
+    os.remove(excel_path)
+    os.remove(html_path)
+    return zip_path
 
 
 def _parse_single_xml(file_stream, filename):
@@ -85,14 +99,15 @@ def parse():
                     cfg['results'] = mask_results(cfg['results'], mask_categories)
 
             if len(configs_data) == 1:
-                # Single file — use existing report
-                filepath = excel_generator.generate(
+                excel_path = excel_generator.generate(
                     configs_data[0]['results'],
                     configs_data[0]['config_type'],
                 )
             else:
-                # Multiple files — comparison report
-                filepath = excel_generator.generate_comparison(configs_data)
+                excel_path = excel_generator.generate_comparison(configs_data)
+
+            html_path = generate_dashboard(configs_data)
+            filepath = _create_zip(excel_path, html_path)
 
         elif method == 'api':
             hostname = request.form.get('hostname', '').strip()
@@ -138,15 +153,23 @@ def parse():
             if mask_categories:
                 all_results = mask_results(all_results, mask_categories)
 
-            filepath = excel_generator.generate(all_results, config_type)
+            excel_path = excel_generator.generate(all_results, config_type)
+            html_path = generate_dashboard([{
+                'filename': hostname,
+                'config_type': config_type,
+                'results': all_results,
+            }])
+            filepath = _create_zip(excel_path, html_path)
         else:
             return 'Invalid method', 400
 
+        mimetype = 'application/zip' if filepath.endswith('.zip') else \
+            'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
         return send_file(
             filepath,
             as_attachment=True,
             download_name=os.path.basename(filepath),
-            mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            mimetype=mimetype,
         )
 
     except ValueError as e:

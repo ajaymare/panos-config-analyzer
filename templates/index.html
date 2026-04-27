@@ -10,7 +10,7 @@
 
 <div class="header">
     <h1>PAN-OS SD-WAN Configuration Parser</h1>
-    <p>Upload config XMLs or connect to a live device to generate an SD-WAN feature report</p>
+    <p>Upload config XMLs or connect to a live device to generate an SD-WAN feature report (Excel + HTML Dashboard)</p>
 </div>
 
 <div class="container">
@@ -54,7 +54,7 @@
                     Or via CLI: <code>show config running</code> &rarr; save to XML
                 </p>
                 <br>
-                <button type="submit" class="btn btn-primary" id="upload-btn">Parse Configuration</button>
+                <button type="submit" class="btn btn-primary" id="upload-btn">Generate Report</button>
             </form>
         </div>
 
@@ -183,7 +183,7 @@ function renderFileList() {
     if (selectedFiles.length > 1) {
         btn.textContent = 'Compare ' + selectedFiles.length + ' Configurations';
     } else {
-        btn.textContent = 'Parse Configuration';
+        btn.textContent = 'Generate Report';
     }
 }
 
@@ -238,7 +238,7 @@ document.querySelectorAll('form').forEach(function(form) {
                 if (!resp.ok) {
                     return resp.text().then(function(t) { throw new Error(t); });
                 }
-                var filename = 'sdwan_report.xlsx';
+                var filename = 'sdwan_report.zip';
                 var cd = resp.headers.get('content-disposition');
                 if (cd) {
                     var match = cd.match(/filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/);

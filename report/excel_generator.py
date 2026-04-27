@@ -42,12 +42,140 @@ CAT_COLORS = {
 }
 
 
+def _add_executive_summary(wb, scored_list, is_first_sheet=True):
+    """Add an Executive Summary sheet with deployment scoring and gap analysis.
+
+    Args:
+        wb: openpyxl Workbook
+        scored_list: list of dicts from scorer.score_configs() or [scorer.score_config()]
+        is_first_sheet: if True, use the active sheet; otherwise create new
+    """
+    if is_first_sheet:
+        ws = wb.active
+        ws.title = 'Executive Summary'
+    else:
+        ws = wb.create_sheet(title='Executive Summary', index=0)
+
+    # Title
+    ws.merge_cells('A1:F1')
+    ws['A1'].value = 'SD-WAN Deployment Executive Summary'
+    ws['A1'].font = Font(name='Calibri', size=16, bold=True, color=styles.BLUE)
+    ws['A1'].alignment = Alignment(horizontal='center')
+
+    ws.merge_cells('A2:F2')
+    ws['A2'].value = f'Generated: {datetime.now().strftime("%Y-%m-%d %H:%M:%S")}'
+    ws['A2'].font = styles.subtitle_font
+    ws['A2'].alignment = Alignment(horizontal='center')
+
+    row = 4
+
+    # Per-config scoring
+    for s in scored_list:
+        sc = s['scoring']
+        name = s.get('filename', 'Config')
+        cfg_type = s.get('config_type', 'unknown')
+
+        # Config header
+        header_fill = PatternFill(start_color='1a2a44', end_color='1a2a44', fill_type='solid')
+        header_font = Font(name='Calibri', size=12, bold=True, color='FFFFFF')
+        for col in range(1, 7):
+            cell = ws.cell(row=row, column=col)
+            cell.fill = header_fill
+            cell.font = header_font
+            cell.border = styles.thin_border
+        ws.cell(row=row, column=1, value=f'{name} ({cfg_type.upper()})')
+        row += 1
+
+        # Score and level
+        level_colors = {'Full': '1E8449', 'Advanced': 'B9770E', 'Basic': '2E86C1'}
+        level_color = level_colors.get(sc['level'], '2E86C1')
+        level_fill = PatternFill(start_color=level_color, end_color=level_color, fill_type='solid')
+
+        ws.cell(row=row, column=1, value='Deployment Maturity')
+        ws.cell(row=row, column=1).font = Font(name='Calibri', size=11, bold=True)
+        cell = ws.cell(row=row, column=2, value=sc['level'])
+        cell.fill = level_fill
+        cell.font = Font(name='Calibri', size=11, bold=True, color='FFFFFF')
+        cell.alignment = Alignment(horizontal='center')
+        cell.border = styles.thin_border
+
+        ws.cell(row=row, column=3, value='Score')
+        ws.cell(row=row, column=3).font = Font(name='Calibri', size=11, bold=True)
+        ws.cell(row=row, column=4, value=f'{sc["score"]}/{sc["total"]} ({sc["percent"]}%)')
+        ws.cell(row=row, column=4).font = Font(name='Calibri', size=11, bold=True, color=level_color)
+        row += 2
+
+        # Category breakdown
+        cat_headers = ['Category', 'Enabled', 'Total', 'Coverage']
+        for col, h in enumerate(cat_headers, 1):
+            ws.cell(row=row, column=col, value=h)
+        styles.style_header_row(ws, row, len(cat_headers))
+        row += 1
+
+        for cat_name, cat_data in sc['category_scores'].items():
+            cat_color = CAT_COLORS.get(cat_name, '2E86C1')
+            ws.cell(row=row, column=1, value=cat_name)
+            styles.style_data_cell(ws.cell(row=row, column=1), row)
+
+            ws.cell(row=row, column=2, value=cat_data['enabled'])
+            ws.cell(row=row, column=2).alignment = Alignment(horizontal='center')
+            ws.cell(row=row, column=2).border = styles.thin_border
+            if cat_data['enabled'] == cat_data['total']:
+                ws.cell(row=row, column=2).font = Font(name='Calibri', size=11, bold=True, color='1E8449')
+            elif cat_data['enabled'] > 0:
+                ws.cell(row=row, column=2).font = Font(name='Calibri', size=11, color='B9770E')
+            else:
+                ws.cell(row=row, column=2).font = Font(name='Calibri', size=11, color='C0392B')
+
+            ws.cell(row=row, column=3, value=cat_data['total'])
+            ws.cell(row=row, column=3).alignment = Alignment(horizontal='center')
+            ws.cell(row=row, column=3).border = styles.thin_border
+
+            ws.cell(row=row, column=4, value=f'{cat_data["percent"]}%')
+            ws.cell(row=row, column=4).alignment = Alignment(horizontal='center')
+            ws.cell(row=row, column=4).border = styles.thin_border
+            row += 1
+
+        row += 1
+
+        # Missing features / recommendations
+        if sc['missing_features']:
+            ws.cell(row=row, column=1, value='Recommendations')
+            ws.cell(row=row, column=1).font = Font(name='Calibri', size=11, bold=True, color='C0392B')
+            row += 1
+            rec_headers = ['Missing Feature', 'Recommendation']
+            for col, h in enumerate(rec_headers, 1):
+                ws.cell(row=row, column=col, value=h)
+            styles.style_header_row(ws, row, len(rec_headers))
+            row += 1
+
+            for feat, rec in zip(sc['missing_features'], sc['recommendations']):
+                ws.cell(row=row, column=1, value=feat)
+                styles.style_data_cell(ws.cell(row=row, column=1), row)
+                ws.cell(row=row, column=2, value=rec)
+                styles.style_data_cell(ws.cell(row=row, column=2), row)
+                row += 1
+        else:
+            ws.cell(row=row, column=1, value='All SD-WAN features are configured.')
+            ws.cell(row=row, column=1).font = Font(name='Calibri', size=11, bold=True, color='1E8449')
+            row += 1
+
+        row += 2  # Space between configs
+
+    styles.auto_width(ws, min_width=14, max_width=60)
+    ws.freeze_panes = 'A4'
+
+
 def generate(results: list, config_type: str = 'unknown') -> str:
     wb = Workbook()
 
+    # ── Executive Summary Sheet ──
+    from .scorer import score_config
+    scoring = score_config(results)
+    _add_executive_summary(wb, [{'filename': 'Config', 'config_type': config_type, 'scoring': scoring}])
+
     # ── Quick Reference Sheet ──
-    ws = wb.active
-    ws.title = 'Quick Reference'
+    ws = wb.create_sheet(title='Quick Reference')
 
     # Title
     ws.merge_cells('A1:F1')
@@ -333,8 +461,14 @@ def generate_comparison(configs_data: list) -> str:
         configs_data: list of dicts with keys: filename, config_type, results
     """
     from collections import OrderedDict
+    from .scorer import score_configs
 
     wb = Workbook()
+
+    # ── Executive Summary Sheet ──
+    scored = score_configs(configs_data)
+    _add_executive_summary(wb, scored)
+
     config_names = [c['filename'] for c in configs_data]
     num_configs = len(config_names)
 
@@ -353,9 +487,8 @@ def generate_comparison(configs_data: list) -> str:
             aggregated[fname] = {'enabled': enabled, 'summary': summary}
         config_features.append(aggregated)
 
-    # ── Sheet 1: Comparison Summary ──
-    ws = wb.active
-    ws.title = 'Comparison Summary'
+    # ── Sheet 2: Comparison Summary ──
+    ws = wb.create_sheet(title='Comparison Summary')
 
     # Title
     total_cols = 1 + num_configs * 2  # Feature + (Status, Summary) per config
