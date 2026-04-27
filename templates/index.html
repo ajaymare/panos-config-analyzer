@@ -10,10 +10,11 @@
 
 <div class="header">
     <h1>PAN-OS SD-WAN Configuration Parser</h1>
-    <p>Upload config XMLs or connect to a live device to generate an SD-WAN feature report (Excel + HTML Dashboard)</p>
+    <p>Upload config XMLs or connect to a live device to generate an SD-WAN feature report</p>
 </div>
 
-<div class="container">
+<!-- Upload / API Form -->
+<div class="container" id="form-section">
     {% if error %}
     <div class="alert alert-error">{{ error }}</div>
     {% endif %}
@@ -104,7 +105,18 @@
     </div>
 </div>
 
-<div class="footer">
+<!-- Dashboard Results (shown after parsing) -->
+<div id="results-section" style="display:none;">
+    <div style="max-width: 1100px; margin: 0 auto; padding: 16px;">
+        <div class="dashboard-actions">
+            <a id="excel-download-btn" class="btn btn-success" href="#" download style="width:auto; text-decoration:none;">Download Excel Report</a>
+            <button class="btn btn-secondary" onclick="showForm()" style="width:auto;">New Analysis</button>
+        </div>
+    </div>
+    <div class="dashboard-results" id="dashboard-content"></div>
+</div>
+
+<div class="footer" id="main-footer">
     PAN-OS SD-WAN Config Parser &mdash; Supports Panorama &amp; NGFW configurations
 </div>
 
@@ -151,7 +163,7 @@ function switchTab(tab) {
     }
 }
 
-// Managed file list — allows removing individual files
+// Managed file list
 var selectedFiles = [];
 
 function renderFileList() {
@@ -198,7 +210,6 @@ function syncFilesToInput() {
 document.getElementById('file-input').addEventListener('change', function() {
     var files = this.files;
     for (var i = 0; i < files.length; i++) {
-        // Avoid duplicates by name
         var exists = false;
         for (var j = 0; j < selectedFiles.length; j++) {
             if (selectedFiles[j].name === files[i].name) { exists = true; break; }
@@ -209,6 +220,21 @@ document.getElementById('file-input').addEventListener('change', function() {
     renderFileList();
 });
 
+function showForm() {
+    document.getElementById('form-section').style.display = '';
+    document.getElementById('results-section').style.display = 'none';
+    document.getElementById('main-footer').style.display = '';
+}
+
+function showDashboard(html, excelUrl) {
+    document.getElementById('form-section').style.display = 'none';
+    document.getElementById('main-footer').style.display = 'none';
+    document.getElementById('dashboard-content').innerHTML = html;
+    document.getElementById('excel-download-btn').href = excelUrl;
+    document.getElementById('results-section').style.display = '';
+    window.scrollTo(0, 0);
+}
+
 function resetUI() {
     document.getElementById('spinner').classList.remove('active');
     var uploadBtn = document.getElementById('upload-btn');
@@ -218,7 +244,7 @@ function resetUI() {
     if (selectedFiles.length > 1) {
         uploadBtn.textContent = 'Compare ' + selectedFiles.length + ' Configurations';
     } else {
-        uploadBtn.textContent = 'Parse Configuration';
+        uploadBtn.textContent = 'Generate Report';
     }
     apiBtn.textContent = 'Connect & Parse';
 }
@@ -230,32 +256,20 @@ document.querySelectorAll('form').forEach(function(form) {
         var submitBtn = form.querySelector('button[type="submit"]');
         if (submitBtn) { submitBtn.disabled = true; submitBtn.textContent = 'Processing...'; }
 
-        // Build FormData manually to ensure files are included
         var formData = new FormData(form);
 
         fetch('/parse', { method: 'POST', body: formData })
             .then(function(resp) {
-                if (!resp.ok) {
-                    return resp.text().then(function(t) { throw new Error(t); });
-                }
-                var filename = 'sdwan_report.zip';
-                var cd = resp.headers.get('content-disposition');
-                if (cd) {
-                    var match = cd.match(/filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/);
-                    if (match) filename = match[1].replace(/['"]/g, '');
-                }
-                return resp.blob().then(function(blob) { return { blob: blob, filename: filename }; });
+                return resp.json().then(function(data) {
+                    if (!resp.ok) {
+                        throw new Error(data.error || 'Unknown error');
+                    }
+                    return data;
+                });
             })
             .then(function(data) {
-                var url = URL.createObjectURL(data.blob);
-                var a = document.createElement('a');
-                a.href = url;
-                a.download = data.filename;
-                document.body.appendChild(a);
-                a.click();
-                a.remove();
-                URL.revokeObjectURL(url);
                 resetUI();
+                showDashboard(data.dashboard_html, data.excel_url);
             })
             .catch(function(err) {
                 resetUI();

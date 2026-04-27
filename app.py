@@ -1,6 +1,6 @@
 """PAN-OS SD-WAN Configuration Parser — Flask App."""
 import os
-import zipfile
+import uuid
 import xml.etree.ElementTree as ET
 
 from flask import Flask, render_template, request, send_file, jsonify
@@ -8,30 +8,21 @@ from flask import Flask, render_template, request, send_file, jsonify
 import config as app_config
 from parsers import config_detector, registry
 from report import excel_generator
-from report.html_dashboard import generate_dashboard
+from report.html_dashboard import generate_dashboard_fragment
 from report.masker import mask_results
 from api_client import connector
 
 app = Flask(__name__)
 app.config['MAX_CONTENT_LENGTH'] = app_config.MAX_CONTENT_LENGTH
 
+# In-memory map of download IDs to file paths
+_download_files = {}
+
 
 @app.route('/')
 def index():
     error = request.args.get('error')
     return render_template('index.html', error=error)
-
-
-def _create_zip(excel_path, html_path):
-    """Bundle Excel and HTML dashboard into a ZIP file."""
-    zip_name = os.path.basename(excel_path).replace('.xlsx', '.zip')
-    zip_path = os.path.join(app_config.REPORT_DIR, zip_name)
-    with zipfile.ZipFile(zip_path, 'w', zipfile.ZIP_DEFLATED) as zf:
-        zf.write(excel_path, os.path.basename(excel_path))
-        zf.write(html_path, os.path.basename(html_path))
-    os.remove(excel_path)
-    os.remove(html_path)
-    return zip_path
 
 
 def _parse_single_xml(file_stream, filename):
@@ -79,7 +70,7 @@ def parse():
         if method == 'upload':
             files = request.files.getlist('config_files')
             if not files or all(f.filename == '' for f in files):
-                return 'No file selected', 400
+                return jsonify({'error': 'No file selected'}), 400
 
             configs_data = []
             for f in files:
@@ -90,7 +81,7 @@ def parse():
                 configs_data.append(config_data)
 
             if not configs_data:
-                return 'No valid files uploaded', 400
+                return jsonify({'error': 'No valid files uploaded'}), 400
 
             # Apply masking if requested
             mask_categories = request.form.getlist('mask_categories')
@@ -106,23 +97,20 @@ def parse():
             else:
                 excel_path = excel_generator.generate_comparison(configs_data)
 
-            html_path = generate_dashboard(configs_data)
-            filepath = _create_zip(excel_path, html_path)
-
         elif method == 'api':
             hostname = request.form.get('hostname', '').strip()
             api_key = request.form.get('api_key', '').strip()
             if not hostname or not api_key:
-                return 'Hostname and API key are required', 400
+                return jsonify({'error': 'Hostname and API key are required'}), 400
 
             verify_ssl = 'verify_ssl' in request.form
             try:
                 xml_root, device_type = connector.fetch_config(hostname, api_key, verify_ssl)
             except Exception as e:
-                return f'API connection failed: {e}', 500
+                return jsonify({'error': f'API connection failed: {e}'}), 500
 
             if xml_root is None:
-                return 'Failed to load configuration', 500
+                return jsonify({'error': 'Failed to load configuration'}), 500
 
             config_type = device_type
             if config_type == 'unknown':
@@ -130,7 +118,7 @@ def parse():
             containers = config_detector.detect(xml_root)
 
             if not containers:
-                return 'No configuration containers found in XML', 400
+                return jsonify({'error': 'No configuration containers found in XML'}), 400
 
             all_results = []
             parser_classes = registry.get_parsers()
@@ -154,28 +142,49 @@ def parse():
                 all_results = mask_results(all_results, mask_categories)
 
             excel_path = excel_generator.generate(all_results, config_type)
-            html_path = generate_dashboard([{
+            configs_data = [{
                 'filename': hostname,
                 'config_type': config_type,
                 'results': all_results,
-            }])
-            filepath = _create_zip(excel_path, html_path)
+            }]
         else:
-            return 'Invalid method', 400
+            return jsonify({'error': 'Invalid method'}), 400
 
-        mimetype = 'application/zip' if filepath.endswith('.zip') else \
-            'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
-        return send_file(
-            filepath,
-            as_attachment=True,
-            download_name=os.path.basename(filepath),
-            mimetype=mimetype,
-        )
+        # Generate dashboard HTML fragment
+        dashboard_html = generate_dashboard_fragment(configs_data)
+
+        # Store Excel file for download with unique ID
+        file_id = uuid.uuid4().hex[:12]
+        _download_files[file_id] = excel_path
+
+        return jsonify({
+            'dashboard_html': dashboard_html,
+            'excel_url': f'/download/{file_id}',
+            'excel_filename': os.path.basename(excel_path),
+        })
 
     except ValueError as e:
-        return str(e), 400
+        return jsonify({'error': str(e)}), 400
     except Exception as e:
-        return f'Unexpected error: {e}', 500
+        return jsonify({'error': f'Unexpected error: {e}'}), 500
+
+
+@app.route('/download/<file_id>')
+def download(file_id):
+    """Serve an Excel report file for download."""
+    filepath = _download_files.get(file_id)
+    if not filepath or not os.path.exists(filepath):
+        return 'File not found', 404
+
+    # Clean up the mapping after download
+    _download_files.pop(file_id, None)
+
+    return send_file(
+        filepath,
+        as_attachment=True,
+        download_name=os.path.basename(filepath),
+        mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    )
 
 
 if __name__ == '__main__':

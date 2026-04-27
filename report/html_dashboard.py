@@ -245,8 +245,66 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
 '''
 
 
+def generate_dashboard_fragment(configs_data):
+    """Generate dashboard HTML fragment for inline display in the web UI.
+
+    Args:
+        configs_data: list of dicts with keys: filename, config_type, results
+
+    Returns:
+        HTML string (no <html>/<head>/<body> wrapper)
+    """
+    scored = score_configs(configs_data)
+    timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    is_comparison = len(scored) > 1
+
+    cards = ''.join(
+        _score_card_html(s['filename'], s['config_type'], s['scoring'])
+        for s in scored
+    )
+    table = _comparison_table_html(scored)
+    gaps = _gap_analysis_html(scored)
+    bars = _category_bars_html(scored)
+
+    title = 'SD-WAN Configuration Comparison' if is_comparison else 'SD-WAN Configuration Analysis'
+    subtitle_parts = []
+    for s in scored:
+        subtitle_parts.append(f'{_esc(s["filename"])} ({s["config_type"].upper()})')
+    subtitle = ' vs '.join(subtitle_parts)
+
+    return f'''
+    <div class="dash-header-inline">
+      <h2>{title}</h2>
+      <p>{subtitle} &mdash; Generated {timestamp}</p>
+    </div>
+
+    <div class="section">
+      <div class="section-title">Deployment Scorecard</div>
+      <div class="score-cards">{cards}</div>
+    </div>
+
+    <div class="section">
+      <div class="section-title">Feature {('Comparison' if is_comparison else 'Summary')}</div>
+      {table}
+    </div>
+
+    <div class="section">
+      <div class="section-title">Category Breakdown</div>
+      <div class="cat-charts">{bars}</div>
+    </div>
+
+    <div class="section">
+      <div class="section-title">Gap Analysis &amp; Recommendations</div>
+      <div class="gap-cards">{gaps}</div>
+    </div>
+
+    <div class="dash-footer-inline">
+      PAN-OS SD-WAN Config Analyzer &mdash; {timestamp}
+    </div>'''
+
+
 def generate_dashboard(configs_data):
-    """Generate a self-contained HTML dashboard.
+    """Generate a self-contained HTML dashboard file.
 
     Args:
         configs_data: list of dicts with keys: filename, config_type, results
