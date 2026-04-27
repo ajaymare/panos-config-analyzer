@@ -2,30 +2,30 @@
 
 ## Project Overview
 
-PAN-OS SD-WAN Configuration Parser — a Docker-based Flask tool that parses Palo Alto Panorama/NGFW XML configs (file upload or live API) and generates Excel + HTML dashboard reports with deployment scoring, gap analysis, and multi-config comparison. Output is a ZIP containing both reports.
+PAN-OS SD-WAN Configuration Parser — a Docker-based Flask tool that parses Palo Alto Panorama/NGFW XML configs (file upload or live API) and generates Excel reports + inline HTML dashboard with deployment scoring, gap analysis, and multi-config comparison. Supports Panorama-managed NGFW correlation and multi-user concurrent access.
 
 ## Architecture
 
-- **Flask app** (`app.py`): Routes for single/multi-file upload and API input, orchestrates parsing pipeline, returns ZIP (Excel + HTML)
+- **Flask app** (`app.py`): Routes for single/multi-file upload and API input, orchestrates parsing pipeline, returns JSON (dashboard HTML + Excel download URL)
 - **Parsers** (`parsers/`): 14 feature-specific modules, each a `BaseParser` subclass with `extract()` method
-- **Config Detector** (`parsers/config_detector.py`): Auto-detects Panorama vs NGFW, enumerates templates/device-groups/shared
+- **Config Detector** (`parsers/config_detector.py`): Auto-detects Panorama vs NGFW, enumerates templates/device-groups/shared, detects Panorama-managed NGFWs
 - **Registry** (`parsers/registry.py`): Auto-discovers all `BaseParser` subclasses via `pkgutil`
 - **API Client** (`api_client/connector.py`): pan-os-python SDK wrapper for live device config retrieval
 - **Report** (`report/excel_generator.py`): Two report modes, both with Executive Summary sheet:
   - `generate()` — Single config: Executive Summary + Quick Reference + detail sheets + All Features
   - `generate_comparison()` — Multi config: Executive Summary + Comparison Summary + merged detail sheets + All Features
-- **HTML Dashboard** (`report/html_dashboard.py`): Self-contained HTML with scorecards, comparison table, category charts, gap analysis
-- **Scorer** (`report/scorer.py`): Deployment maturity scoring (Basic/Advanced/Full) with category breakdowns and recommendations
+- **HTML Dashboard** (`report/html_dashboard.py`): Inline dashboard fragment with scorecards, comparison table, category charts, gap analysis
+- **Scorer** (`report/scorer.py`): Deployment maturity scoring (Basic/Advanced/Full) with category breakdowns, Panorama-managed feature tracking, and recommendations
 - **Masker** (`report/masker.py`): Sensitive data masking with 6 categories (IPs, hostnames, devices, passwords, certs, network addresses)
 
 ## Key Files
 
-- `app.py` — Flask entry point, `/parse` handles both single and multi-file uploads
+- `app.py` — Flask entry point, `/parse` returns JSON (dashboard HTML + Excel URL), `/download/<session>/<file>` serves Excel
 - `parsers/base.py` — `BaseParser` ABC, `FeatureResult` and `ConfigContainer` dataclasses, shared XML helpers
-- `parsers/config_detector.py` — Panorama/NGFW detection, container enumeration (templates, device-groups, shared)
+- `parsers/config_detector.py` — Panorama/NGFW detection, container enumeration, `is_panorama_managed()`, `get_device_serial()`, `get_managed_serials()`
 - `report/excel_generator.py` — Single report + comparison report builders with Executive Summary and category grouping
-- `report/html_dashboard.py` — Self-contained HTML dashboard (inline CSS, no external deps, works offline)
-- `report/scorer.py` — Deployment scoring: `score_config()` and `score_configs()` for maturity grading
+- `report/html_dashboard.py` — Inline dashboard fragment (`generate_dashboard_fragment()`) + standalone HTML (`generate_dashboard()`)
+- `report/scorer.py` — Deployment scoring: `score_config()` and `score_configs()`, tracks `panorama_managed_features` separately
 - `report/masker.py` — Sensitive data masking engine (IP, hostname, device, password, cert, network categories)
 - `report/styles.py` — openpyxl cell styles (header, data, status fills, auto-width)
 - `templates/index.html` — Web UI with multi-file upload, file list with remove buttons
@@ -73,13 +73,28 @@ Config detector creates containers per scope:
 
 Parsers iterate containers and search relative XPaths. Some parsers (VPN topology) use `xml_root` directly for plugins section.
 
-### Deployment Scoring & Dashboard
+### Inline Dashboard & Scoring
+- `/parse` returns JSON: `{ dashboard_html, excel_url, excel_filename }`
+- Dashboard HTML fragment is injected inline in the web UI — no separate file download
+- Excel report served via `/download/<session_id>/<filename>` with per-session isolation
 - `report/scorer.py` scores configs by counting enabled features out of 14: Basic (1-4), Advanced (5-9), Full (10-14)
 - Per-category breakdown (SD-WAN Core, VPN & Topology, Routing, Monitoring, Network Infrastructure)
-- Missing features generate actionable recommendations (defined in `RECOMMENDATIONS` dict)
-- `report/html_dashboard.py` generates a self-contained HTML file with inline CSS (no JS libs)
-- Dashboard sections: scorecards with circular progress, feature comparison table, category bar charts, gap analysis
-- `app.py` bundles Excel + HTML into a ZIP via `_create_zip()` before returning to the client
+- Panorama-managed features tracked separately — count toward score, shown in amber
+- Three status indicators in dashboard: green checkmark (enabled), amber diamond (Panorama-Managed), red X (missing)
+- Software version info (PAN-OS version, SD-WAN plugin version) shown in scorecards and Excel
+
+### Panorama-Managed NGFW Handling
+- `config_detector.is_panorama_managed()` checks for `panorama/local-panorama/panorama-server` in NGFW config
+- `config_detector.get_device_serial()` extracts serial from `mgt-config/devices/entry`
+- `config_detector.get_managed_serials()` lists SD-WAN device serials from Panorama's `plugins/sd_wan/devices`
+- NGFW uploaded alone: SD-WAN features marked "Panorama-Managed" instead of "Not configured"
+- NGFW + Panorama uploaded together: `_correlate_with_panorama()` copies Panorama's SD-WAN results to NGFW with source "Panorama → {device}"
+- `_PANORAMA_SDWAN_FEATURES` in `app.py` defines which features are Panorama-managed (interface profiles, policies, VPN topology, etc.)
+
+### Multi-User Isolation
+- Each `/parse` request creates a unique session directory under `REPORT_DIR/<uuid>/`
+- Excel files are scoped to the session directory
+- Download URLs include session ID: `/download/<session_id>/<filename>`
 
 ### Sensitive Data Masking
 - `report/masker.py` applies masking to `FeatureResult` objects before report generation

@@ -7,11 +7,14 @@ Docker-based tool with a Flask web UI that parses Palo Alto Panorama/NGFW config
 - **Multi-Config Comparison**: Upload multiple Panorama and NGFW configs to compare features side-by-side
 - **Single Config Analysis**: Upload one XML or connect to a live device via PAN-OS API
 - **Panorama + NGFW**: Automatically detects config type, enumerates templates, template-stacks, and device-groups
+- **Panorama-Managed NGFW Detection**: Detects Panorama-managed NGFWs and correlates SD-WAN features from Panorama config
+- **Inline Dashboard**: HTML dashboard renders directly in the web UI after parsing — no separate file download
 - **14 SD-WAN Feature Parsers**: Comprehensive extraction of all SD-WAN related configuration
-- **HTML Dashboard**: Visual scorecards, deployment maturity scoring (Basic/Advanced/Full), category bar charts, and gap analysis
+- **Software Version Detection**: Extracts PAN-OS version and SD-WAN plugin version from configs
 - **Deployment Scoring**: Automatic maturity grading based on enabled features (Basic: 1-4, Advanced: 5-9, Full: 10-14)
 - **Excel Reports**: Executive Summary with scoring + Quick Reference + detailed per-feature sheets + comparison views
 - **Sensitive Data Masking**: Selectively mask IPs, hostnames, device names, passwords, certificates, and network addresses
+- **Multi-User Support**: Per-session isolation — multiple users can parse configs simultaneously
 - **HTTPS Support**: Self-signed certificate with nginx reverse proxy on port 9443
 - **Dockerized**: Single container, no external dependencies
 
@@ -60,15 +63,24 @@ docker run -d --name panos-parser -p 8080:8080 -p 9443:9443 ajaymare/panos-confi
    - **CLI**: `show config running` → save to XML
 2. Open `http://localhost:8080`
 3. Select one XML file → click "Generate Report"
-4. ZIP file downloads containing Excel report + HTML dashboard
+4. Dashboard displays inline with scorecards, feature summary, and gap analysis
+5. Click "Download Excel Report" for the detailed Excel file
 
 ### Multi-Config Comparison
 
 1. Export configs from multiple devices (Panorama + NGFWs)
 2. Open `http://localhost:8080`
 3. Select multiple XML files → click "Compare N Configurations"
-4. ZIP file downloads with comparison Excel + HTML dashboard with side-by-side scoring
-5. Use the X button to remove individual files before submitting
+4. Comparison dashboard displays inline with side-by-side scoring and feature comparison
+5. Click "Download Excel Report" for the detailed comparison Excel
+6. Use the X button to remove individual files before submitting
+
+### Panorama-Managed NGFW Configs
+
+NGFW configs exported from Panorama-managed devices don't contain SD-WAN configuration locally — it's pushed from Panorama. The tool handles this automatically:
+
+- **NGFW uploaded alone**: SD-WAN features show as "Panorama-Managed" (amber) instead of "Not configured" (red)
+- **NGFW + Panorama uploaded together**: SD-WAN features from Panorama are correlated and attributed to each NGFW device, giving a complete picture
 
 ### Mask Sensitive Information
 
@@ -90,15 +102,15 @@ Use "Select All" to enable all categories, or pick individual ones.
    ```
 2. Open `http://localhost:8080`
 3. Select "Connect via API" tab → enter hostname and API key → click "Connect & Parse"
-4. ZIP file downloads containing Excel report + HTML dashboard
+4. Dashboard displays inline; click "Download Excel Report" for the Excel file
 
 ## Report Output
 
-The tool generates a ZIP file containing both an Excel report and an HTML dashboard.
+The inline dashboard displays immediately after parsing. The Excel report is available via download button.
 
-### HTML Dashboard
-- **Deployment Scorecards**: Per-config cards with maturity level (Basic/Advanced/Full), circular progress indicator, enabled/missing counts
-- **Feature Comparison Table**: All 14 features grouped by category with green checkmark / red X per config
+### Inline Dashboard
+- **Deployment Scorecards**: Per-config cards with maturity level (Basic/Advanced/Full), circular progress, PAN-OS and SD-WAN plugin versions
+- **Feature Comparison Table**: All 14 features grouped by category — green checkmark (enabled), amber diamond (Panorama-Managed), red X (missing)
 - **Category Bar Charts**: Horizontal bars showing coverage percentage per category per config
 - **Gap Analysis**: Missing features with actionable recommendations for each config
 
