@@ -5,7 +5,7 @@ Docker-based tool with a Flask web UI that parses Palo Alto Panorama/NGFW config
 ## Features
 
 - **Multi-Config Comparison**: Upload multiple Panorama and NGFW configs to compare features side-by-side
-- **Single Config Analysis**: Upload one XML or connect to a live device via PAN-OS API
+- **Single Config Analysis**: Upload one XML file for detailed analysis
 - **Panorama + NGFW**: Automatically detects config type, enumerates templates, template-stacks, and device-groups
 - **Panorama-Managed NGFW Detection**: Detects Panorama-managed NGFWs and correlates SD-WAN features from Panorama config
 - **Inline Dashboard**: HTML dashboard renders directly in the web UI after parsing — no separate file download
@@ -94,16 +94,6 @@ Before parsing, optionally enable masking to redact sensitive data from the repo
 
 Use "Select All" to enable all categories, or pick individual ones.
 
-### Connect via API
-
-1. Generate an API key:
-   ```bash
-   curl -k -X GET 'https://<host>/api/?type=keygen&user=admin&password=admin'
-   ```
-2. Open `http://localhost:8080`
-3. Select "Connect via API" tab → enter hostname and API key → click "Connect & Parse"
-4. Dashboard displays inline; click "Download Excel Report" for the Excel file
-
 ## Report Output
 
 The inline dashboard displays immediately after parsing. The Excel report is available via download button.
@@ -161,7 +151,6 @@ parser/
 
 - Flask — Web framework
 - openpyxl — Excel generation
-- pan-os-python — PAN-OS API connectivity
 - lxml — XML parsing
 - gunicorn — Production WSGI server
 - nginx — HTTPS reverse proxy with self-signed certificate

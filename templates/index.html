@@ -10,23 +10,17 @@
 
 <div class="header">
     <h1>PAN-OS SD-WAN Configuration Parser</h1>
-    <p>Upload config XMLs or connect to a live device to generate an SD-WAN feature report</p>
+    <p>Upload config XMLs to generate an SD-WAN feature report</p>
 </div>
 
-<!-- Upload / API Form -->
 <div class="container" id="form-section">
     {% if error %}
     <div class="alert alert-error">{{ error }}</div>
     {% endif %}
 
     <div class="card">
-        <div class="tabs">
-            <div class="tab active" onclick="switchTab('upload')">Upload XML Files</div>
-            <div class="tab" onclick="switchTab('api')">Connect via API</div>
-        </div>
-
-        <!-- Upload Tab -->
-        <div class="tab-content active" id="tab-upload">
+        <div class="card-header">Upload XML Files</div>
+        <div style="padding: 20px;">
             <form method="POST" action="/parse" enctype="multipart/form-data" id="upload-form">
                 <input type="hidden" name="method" value="upload">
                 <div class="form-group">
@@ -37,15 +31,15 @@
                 <div class="mask-section">
                     <div class="mask-header">
                         <span class="mask-title">Mask Sensitive Information</span>
-                        <label class="mask-toggle"><input type="checkbox" id="mask-all-upload" onchange="toggleAllMask('upload')"> Select All</label>
+                        <label class="mask-toggle"><input type="checkbox" id="mask-all" onchange="toggleAllMask()"> Select All</label>
                     </div>
                     <div class="mask-grid">
-                        <label><input type="checkbox" name="mask_categories" value="ip_addresses" class="mask-cb-upload"> IP Addresses</label>
-                        <label><input type="checkbox" name="mask_categories" value="hostnames" class="mask-cb-upload"> Hostnames &amp; FQDNs</label>
-                        <label><input type="checkbox" name="mask_categories" value="devices" class="mask-cb-upload"> Device Names &amp; Serials</label>
-                        <label><input type="checkbox" name="mask_categories" value="passwords" class="mask-cb-upload"> Passwords &amp; Keys</label>
-                        <label><input type="checkbox" name="mask_categories" value="certificates" class="mask-cb-upload"> Certificates</label>
-                        <label><input type="checkbox" name="mask_categories" value="network" class="mask-cb-upload"> Network Addresses</label>
+                        <label><input type="checkbox" name="mask_categories" value="ip_addresses" class="mask-cb"> IP Addresses</label>
+                        <label><input type="checkbox" name="mask_categories" value="hostnames" class="mask-cb"> Hostnames &amp; FQDNs</label>
+                        <label><input type="checkbox" name="mask_categories" value="devices" class="mask-cb"> Device Names &amp; Serials</label>
+                        <label><input type="checkbox" name="mask_categories" value="passwords" class="mask-cb"> Passwords &amp; Keys</label>
+                        <label><input type="checkbox" name="mask_categories" value="certificates" class="mask-cb"> Certificates</label>
+                        <label><input type="checkbox" name="mask_categories" value="network" class="mask-cb"> Network Addresses</label>
                     </div>
                 </div>
                 <p class="info-text">
@@ -56,44 +50,6 @@
                 </p>
                 <br>
                 <button type="submit" class="btn btn-primary" id="upload-btn">Generate Report</button>
-            </form>
-        </div>
-
-        <!-- API Tab -->
-        <div class="tab-content" id="tab-api">
-            <form method="POST" action="/parse" id="api-form">
-                <input type="hidden" name="method" value="api">
-                <div class="form-group">
-                    <label>Hostname / IP Address</label>
-                    <input type="text" name="hostname" placeholder="10.0.0.1 or panorama.example.com">
-                </div>
-                <div class="form-group">
-                    <label>API Key</label>
-                    <input type="password" name="api_key" placeholder="Your PAN-OS API key">
-                </div>
-                <div class="checkbox-group">
-                    <input type="checkbox" name="verify_ssl" id="verify_ssl">
-                    <label for="verify_ssl">Verify SSL Certificate</label>
-                </div>
-                <div class="mask-section">
-                    <div class="mask-header">
-                        <span class="mask-title">Mask Sensitive Information</span>
-                        <label class="mask-toggle"><input type="checkbox" id="mask-all-api" onchange="toggleAllMask('api')"> Select All</label>
-                    </div>
-                    <div class="mask-grid">
-                        <label><input type="checkbox" name="mask_categories" value="ip_addresses" class="mask-cb-api"> IP Addresses</label>
-                        <label><input type="checkbox" name="mask_categories" value="hostnames" class="mask-cb-api"> Hostnames &amp; FQDNs</label>
-                        <label><input type="checkbox" name="mask_categories" value="devices" class="mask-cb-api"> Device Names &amp; Serials</label>
-                        <label><input type="checkbox" name="mask_categories" value="passwords" class="mask-cb-api"> Passwords &amp; Keys</label>
-                        <label><input type="checkbox" name="mask_categories" value="certificates" class="mask-cb-api"> Certificates</label>
-                        <label><input type="checkbox" name="mask_categories" value="network" class="mask-cb-api"> Network Addresses</label>
-                    </div>
-                </div>
-                <p class="info-text">
-                    Generate an API key: <code>curl -k -X GET 'https://&lt;host&gt;/api/?type=keygen&amp;user=admin&amp;password=admin'</code>
-                </p>
-                <br>
-                <button type="submit" class="btn btn-primary" id="api-btn">Connect &amp; Parse</button>
             </form>
         </div>
     </div>
@@ -121,17 +77,17 @@
 </div>
 
 <script>
-function toggleAllMask(tab) {
-    var allCb = document.getElementById('mask-all-' + tab);
-    var checkboxes = document.querySelectorAll('.mask-cb-' + tab);
+function toggleAllMask() {
+    var allCb = document.getElementById('mask-all');
+    var checkboxes = document.querySelectorAll('.mask-cb');
     for (var i = 0; i < checkboxes.length; i++) {
         checkboxes[i].checked = allCb.checked;
     }
 }
 
-function updateSelectAll(tab) {
-    var checkboxes = document.querySelectorAll('.mask-cb-' + tab);
-    var allCb = document.getElementById('mask-all-' + tab);
+function updateSelectAll() {
+    var checkboxes = document.querySelectorAll('.mask-cb');
+    var allCb = document.getElementById('mask-all');
     var allChecked = true;
     for (var i = 0; i < checkboxes.length; i++) {
         if (!checkboxes[i].checked) { allChecked = false; break; }
@@ -140,28 +96,11 @@ function updateSelectAll(tab) {
 }
 
 document.addEventListener('DOMContentLoaded', function() {
-    var tabs = ['upload', 'api'];
-    for (var t = 0; t < tabs.length; t++) {
-        var cbs = document.querySelectorAll('.mask-cb-' + tabs[t]);
-        for (var i = 0; i < cbs.length; i++) {
-            (function(tab) {
-                cbs[i].addEventListener('change', function() { updateSelectAll(tab); });
-            })(tabs[t]);
-        }
+    var cbs = document.querySelectorAll('.mask-cb');
+    for (var i = 0; i < cbs.length; i++) {
+        cbs[i].addEventListener('change', function() { updateSelectAll(); });
     }
 });
-
-function switchTab(tab) {
-    document.querySelectorAll('.tab').forEach(function(t) { t.classList.remove('active'); });
-    document.querySelectorAll('.tab-content').forEach(function(c) { c.classList.remove('active'); });
-    if (tab === 'upload') {
-        document.querySelectorAll('.tab')[0].classList.add('active');
-        document.getElementById('tab-upload').classList.add('active');
-    } else {
-        document.querySelectorAll('.tab')[1].classList.add('active');
-        document.getElementById('tab-api').classList.add('active');
-    }
-}
 
 // Managed file list
 var selectedFiles = [];
@@ -238,49 +177,45 @@ function showDashboard(html, excelUrl) {
 function resetUI() {
     document.getElementById('spinner').classList.remove('active');
     var uploadBtn = document.getElementById('upload-btn');
-    var apiBtn = document.getElementById('api-btn');
     uploadBtn.disabled = false;
-    apiBtn.disabled = false;
     if (selectedFiles.length > 1) {
         uploadBtn.textContent = 'Compare ' + selectedFiles.length + ' Configurations';
     } else {
         uploadBtn.textContent = 'Generate Report';
     }
-    apiBtn.textContent = 'Connect & Parse';
 }
 
-document.querySelectorAll('form').forEach(function(form) {
-    form.addEventListener('submit', function(e) {
-        e.preventDefault();
-        document.getElementById('spinner').classList.add('active');
-        var submitBtn = form.querySelector('button[type="submit"]');
-        if (submitBtn) { submitBtn.disabled = true; submitBtn.textContent = 'Processing...'; }
+document.getElementById('upload-form').addEventListener('submit', function(e) {
+    e.preventDefault();
+    document.getElementById('spinner').classList.add('active');
+    var submitBtn = document.getElementById('upload-btn');
+    submitBtn.disabled = true;
+    submitBtn.textContent = 'Processing...';
 
-        var formData = new FormData(form);
+    var formData = new FormData(this);
 
-        fetch('/parse', { method: 'POST', body: formData })
-            .then(function(resp) {
-                return resp.json().then(function(data) {
-                    if (!resp.ok) {
-                        throw new Error(data.error || 'Unknown error');
-                    }
-                    return data;
-                });
-            })
-            .then(function(data) {
-                resetUI();
-                showDashboard(data.dashboard_html, data.excel_url);
-            })
-            .catch(function(err) {
-                resetUI();
-                var existing = document.querySelector('.alert');
-                if (existing) existing.remove();
-                var div = document.createElement('div');
-                div.className = 'alert alert-error';
-                div.textContent = 'Error: ' + err.message;
-                document.querySelector('.container').insertBefore(div, document.querySelector('.card'));
+    fetch('/parse', { method: 'POST', body: formData })
+        .then(function(resp) {
+            return resp.json().then(function(data) {
+                if (!resp.ok) {
+                    throw new Error(data.error || 'Unknown error');
+                }
+                return data;
             });
-    });
+        })
+        .then(function(data) {
+            resetUI();
+            showDashboard(data.dashboard_html, data.excel_url);
+        })
+        .catch(function(err) {
+            resetUI();
+            var existing = document.querySelector('.alert');
+            if (existing) existing.remove();
+            var div = document.createElement('div');
+            div.className = 'alert alert-error';
+            div.textContent = 'Error: ' + err.message;
+            document.querySelector('.container').insertBefore(div, document.querySelector('.card'));
+        });
 });
 </script>
 

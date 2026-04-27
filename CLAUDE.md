@@ -6,11 +6,10 @@ PAN-OS SD-WAN Configuration Parser — a Docker-based Flask tool that parses Pal
 
 ## Architecture
 
-- **Flask app** (`app.py`): Routes for single/multi-file upload and API input, orchestrates parsing pipeline, returns JSON (dashboard HTML + Excel download URL)
+- **Flask app** (`app.py`): Routes for single/multi-file upload, orchestrates parsing pipeline, returns JSON (dashboard HTML + Excel download URL)
 - **Parsers** (`parsers/`): 14 feature-specific modules, each a `BaseParser` subclass with `extract()` method
 - **Config Detector** (`parsers/config_detector.py`): Auto-detects Panorama vs NGFW, enumerates templates/device-groups/shared, detects Panorama-managed NGFWs
 - **Registry** (`parsers/registry.py`): Auto-discovers all `BaseParser` subclasses via `pkgutil`
-- **API Client** (`api_client/connector.py`): pan-os-python SDK wrapper for live device config retrieval
 - **Report** (`report/excel_generator.py`): Two report modes, both with Executive Summary sheet:
   - `generate()` — Single config: Executive Summary + Quick Reference + detail sheets + All Features
   - `generate_comparison()` — Multi config: Executive Summary + Comparison Summary + merged detail sheets + All Features
@@ -20,7 +19,7 @@ PAN-OS SD-WAN Configuration Parser — a Docker-based Flask tool that parses Pal
 
 ## Key Files
 
-- `app.py` — Flask entry point, `/parse` returns JSON (dashboard HTML + Excel URL), `/download/<session>/<file>` serves Excel
+- `app.py` — Flask entry point, `/parse` (file upload only) returns JSON (dashboard HTML + Excel URL), `/download/<session>/<file>` serves Excel
 - `parsers/base.py` — `BaseParser` ABC, `FeatureResult` and `ConfigContainer` dataclasses, shared XML helpers
 - `parsers/config_detector.py` — Panorama/NGFW detection, container enumeration, `is_panorama_managed()`, `get_device_serial()`, `get_managed_serials()`
 - `report/excel_generator.py` — Single report + comparison report builders with Executive Summary and category grouping
@@ -102,9 +101,6 @@ Parsers iterate containers and search relative XPaths. Some parsers (VPN topolog
 - UI sends `mask_categories` form field; `app.py` calls `mask_results()` on parsed results
 - Column-based matching (maps column names to categories) + regex scanning (IPs, FQDNs)
 - Device masking uses consistent mapping (`DEVICE-001`, `DEVICE-002`) across the entire report
-
-### pan-os-python SDK
-SDK has no SD-WAN classes. Used only for API connectivity (`xapi.show('/config')`). All extraction uses `xml.etree.ElementTree`.
 
 ## Git
 
