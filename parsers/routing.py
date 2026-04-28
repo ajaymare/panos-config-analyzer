@@ -19,15 +19,24 @@ class RoutingParser(BaseParser):
 
             columns = ['Router Name', 'Type', 'BGP Enabled', 'BGP Router ID', 'BGP AS',
                         'OSPF Enabled', 'ECMP Enabled', 'ECMP Max Path',
-                        'Interfaces', 'Static Routes']
+                        'Interfaces', 'Static Routes',
+                        'Fast External Failover', 'Graceful Restart',
+                        'Stale Route Time', 'OSPFv3 (IPv6)']
 
             rows = []
             for vr in vrs:
                 bgp = vr.find('protocol/bgp')
                 ospf = vr.find('protocol/ospf')
+                ospfv3 = vr.find('protocol/ospfv3')
                 ecmp = vr.find('ecmp')
                 static_routes = self._find_all(vr, 'routing-table/ip/static-route/entry')
                 interfaces = self._find_all(vr, 'interface/member')
+
+                # BGP graceful restart
+                gr = bgp.find('graceful-restart') if bgp is not None else None
+                gr_enabled = self._find_text(gr, 'enable', 'no') if gr is not None else 'no'
+                stale_time = self._find_text(gr, 'stale-route-time') if gr is not None else ''
+
                 rows.append([
                     self._get_name(vr),
                     'Virtual Router',
@@ -39,16 +48,25 @@ class RoutingParser(BaseParser):
                     self._find_text(ecmp, 'max-path') if ecmp is not None else '',
                     ', '.join(m.text for m in interfaces if m.text),
                     str(len(static_routes)),
+                    self._find_text(bgp, 'fast-external-failover', 'no') if bgp is not None else 'no',
+                    gr_enabled,
+                    stale_time,
+                    self._find_text(ospfv3, 'enable', 'no') if ospfv3 is not None else 'no',
                 ])
 
             for lr in lrs:
                 vrfs = self._find_all(lr, 'vrf/entry')
                 for vrf in vrfs:
-                    # In logical routers, BGP/OSPF/ECMP are under each VRF
                     bgp = vrf.find('bgp')
                     ospf = vrf.find('ospf')
+                    ospfv3 = vrf.find('ospfv3')
                     ecmp = vrf.find('ecmp')
                     interfaces = self._find_all(vrf, 'interface/member')
+
+                    gr = bgp.find('graceful-restart') if bgp is not None else None
+                    gr_enabled = self._find_text(gr, 'enable', 'no') if gr is not None else 'no'
+                    stale_time = self._find_text(gr, 'stale-route-time') if gr is not None else ''
+
                     rows.append([
                         f"{self._get_name(lr)} / VRF:{self._get_name(vrf)}",
                         'Logical Router (VRF)',
@@ -60,6 +78,10 @@ class RoutingParser(BaseParser):
                         self._find_text(ecmp, 'max-path') if ecmp is not None else '',
                         ', '.join(m.text for m in interfaces if m.text),
                         '',
+                        self._find_text(bgp, 'fast-external-failover', 'no') if bgp is not None else 'no',
+                        gr_enabled,
+                        stale_time,
+                        self._find_text(ospfv3, 'enable', 'no') if ospfv3 is not None else 'no',
                     ])
 
             results.append(FeatureResult(

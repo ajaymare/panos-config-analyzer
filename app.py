@@ -21,6 +21,7 @@ _PANORAMA_SDWAN_FEATURES = {
     'Traffic Distribution Profiles', 'SD-WAN Policy Rules',
     'VPN Clusters - Topology', 'SaaS Quality Monitoring',
     'Digital Experience Monitoring', 'Link Management',
+    'ZTP Support',
 }
 
 

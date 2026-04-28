@@ -106,6 +106,64 @@ def _comparison_table_html(scored_configs):
     </table>'''
 
 
+def _feature_details_html(configs_data):
+    """Render detailed feature breakdown showing what's configured per device/source."""
+    sections = ''
+    num_configs = len(configs_data)
+
+    # Build all rows across all configs
+    rows = ''
+    for cat_name, features in FEATURE_CATEGORIES.items():
+        color = _cat_color_css(CAT_COLORS.get(cat_name, '2E86C1'))
+        rows += f'<tr class="cat-row" style="background:{color}"><td colspan="5">{_esc(cat_name)}</td></tr>\n'
+
+        for feat in features:
+            for cfg in configs_data:
+                cfg_name = cfg.get('filename', 'Config')
+                feat_groups = {}
+                for r in cfg['results']:
+                    if r.feature_name not in feat_groups:
+                        feat_groups[r.feature_name] = []
+                    feat_groups[r.feature_name].append(r)
+
+                rlist = feat_groups.get(feat, [])
+                enabled_results = [r for r in rlist if r.enabled]
+
+                if not enabled_results:
+                    rows += f'''<tr>
+                      <td class="detail-device">{_esc(cfg_name)}</td>
+                      <td class="feat-name">{_esc(feat)}</td>
+                      <td class="status-cell disabled">&#10007;</td>
+                      <td>—</td>
+                      <td>Not configured</td>
+                    </tr>\n'''
+                    continue
+
+                for r in enabled_results:
+                    items = r.summary
+                    if ':' in items:
+                        items = items.split(':', 1)[1].strip()
+                    count = len([e.strip() for e in items.split(',') if e.strip()]) if items else 0
+
+                    rows += f'''<tr>
+                      <td class="detail-device">{_esc(cfg_name)}</td>
+                      <td class="feat-name">{_esc(feat)}</td>
+                      <td class="status-cell enabled">&#10003;</td>
+                      <td class="detail-source">{_esc(r.source)}</td>
+                      <td class="detail-items">{_esc(items)} <span class="detail-count">({count})</span></td>
+                    </tr>\n'''
+
+    sections = f'''
+    <div class="detail-card">
+      <table class="detail-table">
+        <thead><tr><th>Device</th><th>Feature</th><th>Status</th><th>Device / Source</th><th>Configured Items</th></tr></thead>
+        <tbody>{rows}</tbody>
+      </table>
+    </div>'''
+
+    return sections
+
+
 def _gap_analysis_html(scored_configs):
     """Render the gap analysis section."""
     sections = ''
@@ -255,6 +313,19 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
 .cat-bar-val { font-size: 11px; font-weight: 600; width: 30px; text-align: right;
   color: #1a2a44; flex-shrink: 0; }
 
+/* Feature Details */
+.detail-card { background: #fff; border: 1px solid #d4dbe6; border-radius: 8px;
+  overflow: hidden; margin-bottom: 16px; box-shadow: 0 2px 8px rgba(0,0,0,0.06); }
+.detail-card h4 { font-size: 14px; padding: 12px 16px; margin: 0;
+  background: #f7f9fc; border-bottom: 1px solid #e8ecf0; color: #1a2a44; }
+.detail-table { width: 100%; border-collapse: collapse; }
+.detail-table th { background: #1a2a44; color: #fff; padding: 8px 12px;
+  font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; text-align: left; }
+.detail-table td { padding: 6px 12px; border-bottom: 1px solid #e8ecf0; font-size: 12px; }
+.detail-source { color: #0066cc; font-weight: 600; }
+.detail-items { color: #4a5568; }
+.detail-count { color: #1E8449; font-weight: 700; font-size: 11px; }
+
 /* Footer */
 .dash-footer { text-align: center; padding: 16px; font-size: 11px; color: #6b7a8d; }
 
@@ -284,6 +355,7 @@ def generate_dashboard_fragment(configs_data):
         for s in scored
     )
     table = _comparison_table_html(scored)
+    details = _feature_details_html(configs_data)
     gaps = _gap_analysis_html(scored)
     bars = _category_bars_html(scored)
 
@@ -307,6 +379,11 @@ def generate_dashboard_fragment(configs_data):
     <div class="section">
       <div class="section-title">Feature {('Comparison' if is_comparison else 'Summary')}</div>
       {table}
+    </div>
+
+    <div class="section">
+      <div class="section-title">Feature Details</div>
+      {details}
     </div>
 
     <div class="section">
@@ -348,6 +425,9 @@ def generate_dashboard(configs_data):
     # Comparison table
     table = _comparison_table_html(scored)
 
+    # Feature details
+    details = _feature_details_html(configs_data)
+
     # Gap analysis
     gaps = _gap_analysis_html(scored)
 
@@ -385,6 +465,11 @@ def generate_dashboard(configs_data):
   <div class="section">
     <div class="section-title">Feature {('Comparison' if is_comparison else 'Summary')}</div>
     {table}
+  </div>
+
+  <div class="section">
+    <div class="section-title">Feature Details</div>
+    {details}
   </div>
 
   <div class="section">

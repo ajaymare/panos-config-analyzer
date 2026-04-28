@@ -47,10 +47,15 @@ class LinkManagementParser(BaseParser):
                     ip_addr,
                 ])
 
+            if rows:
+                intf_names = [r[0] for r in rows if r and r[0]]
+                summary = f"{c.name}: {', '.join(intf_names)}"
+            else:
+                summary = "Not configured"
             results.append(FeatureResult(
                 feature_name=self.FEATURE_NAME,
                 enabled=len(rows) > 0,
-                summary=f"{len(rows)} SD-WAN links configured" if rows else "Not configured",
+                summary=summary,
                 columns=columns,
                 rows=rows,
                 source=c.name,

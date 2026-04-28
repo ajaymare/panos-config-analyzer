@@ -21,11 +21,18 @@ class VPNTunnelsParser(BaseParser):
             ike_gw = self._find_all(c.xml_node, IKE_GW_XPATH)
 
             columns = ['Name', 'Type', 'IKE Gateway', 'Tunnel Interface',
-                        'IPSec Crypto Profile', 'Proxy ID', 'Disabled']
+                        'IPSec Crypto Profile', 'Proxy ID', 'Tunnel Monitor', 'Disabled']
 
             rows = []
             for entry in ipsec:
                 ike_gw_entry = entry.find('auto-key/ike-gateway/entry')
+                # Tunnel monitor
+                tm = entry.find('tunnel-monitor')
+                tunnel_mon = ''
+                if tm is not None:
+                    tm_enabled = self._find_text(tm, 'enable', 'no')
+                    tm_dest = self._find_text(tm, 'destination-ip')
+                    tunnel_mon = f"{tm_enabled}" + (f" ({tm_dest})" if tm_dest else '')
                 rows.append([
                     self._get_name(entry),
                     'IPSec Tunnel',
@@ -33,6 +40,7 @@ class VPNTunnelsParser(BaseParser):
                     self._find_text(entry, 'tunnel-interface'),
                     self._find_text(entry, 'auto-key/ipsec-crypto-profile'),
                     self._find_text(entry, 'auto-key/proxy-id/entry'),
+                    tunnel_mon,
                     self._find_text(entry, 'disabled', 'no'),
                 ])
 

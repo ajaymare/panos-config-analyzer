@@ -29,6 +29,7 @@ FEATURE_CATEGORIES = {
     'Network Infrastructure': [
         'Zones and Interfaces', 'QoS Profiles',
         'Link Management', 'Certificate Profiles',
+        'ZTP Support',
     ],
 }
 
@@ -136,7 +137,7 @@ def _add_executive_summary(wb, scored_list, is_first_sheet=True):
         ws.cell(row=row, column=4).font = Font(name='Calibri', size=11, bold=True, color=level_color)
         row += 2
 
-        # Category breakdown
+        # Category breakdown with coverage
         cat_headers = ['Category', 'Enabled', 'Total', 'Coverage']
         for col, h in enumerate(cat_headers, 1):
             ws.cell(row=row, column=col, value=h)
@@ -168,6 +169,74 @@ def _add_executive_summary(wb, scored_list, is_first_sheet=True):
             row += 1
 
         row += 1
+
+        # Feature Details — show what's configured per device/source
+        results = s.get('results', [])
+        if results:
+            # Group results by feature
+            feat_groups = {}
+            for r in results:
+                if r.feature_name not in feat_groups:
+                    feat_groups[r.feature_name] = []
+                feat_groups[r.feature_name].append(r)
+
+            detail_headers = ['Device', 'Feature', 'Status', 'Device / Source', 'Configured Items']
+            for col, h in enumerate(detail_headers, 1):
+                ws.cell(row=row, column=col, value=h)
+            styles.style_header_row(ws, row, len(detail_headers))
+            row += 1
+
+            for cat_name, features in FEATURE_CATEGORIES.items():
+                cat_color = CAT_COLORS.get(cat_name, '2E86C1')
+                cat_fill = PatternFill(start_color=cat_color, end_color=cat_color, fill_type='solid')
+                cat_font = Font(name='Calibri', size=11, bold=True, color='FFFFFF')
+                for col in range(1, len(detail_headers) + 1):
+                    cell = ws.cell(row=row, column=col)
+                    cell.fill = cat_fill
+                    cell.font = cat_font
+                    cell.border = styles.thin_border
+                ws.cell(row=row, column=1, value=cat_name)
+                row += 1
+
+                for feat_name in features:
+                    rlist = feat_groups.get(feat_name, [])
+                    enabled_results = [r for r in rlist if r.enabled]
+
+                    if not enabled_results:
+                        ws.cell(row=row, column=1, value=name)
+                        styles.style_data_cell(ws.cell(row=row, column=1), row)
+                        ws.cell(row=row, column=2, value=feat_name)
+                        styles.style_data_cell(ws.cell(row=row, column=2), row)
+                        styles.style_status_cell(ws.cell(row=row, column=3), False)
+                        ws.cell(row=row, column=4, value='—')
+                        styles.style_data_cell(ws.cell(row=row, column=4), row)
+                        ws.cell(row=row, column=5, value='Not configured')
+                        ws.cell(row=row, column=5).font = Font(name='Calibri', size=11, color='C0392B')
+                        ws.cell(row=row, column=5).border = styles.thin_border
+                        row += 1
+                        continue
+
+                    for r in enabled_results:
+                        ws.cell(row=row, column=1, value=name)
+                        styles.style_data_cell(ws.cell(row=row, column=1), row)
+                        ws.cell(row=row, column=2, value=feat_name)
+                        styles.style_data_cell(ws.cell(row=row, column=2), row)
+                        styles.style_status_cell(ws.cell(row=row, column=3), True)
+
+                        ws.cell(row=row, column=4, value=r.source)
+                        ws.cell(row=row, column=4).font = Font(name='Calibri', size=11, bold=True, color='0066CC')
+                        ws.cell(row=row, column=4).border = styles.thin_border
+
+                        # Extract items from summary
+                        items = r.summary
+                        if ':' in items:
+                            items = items.split(':', 1)[1].strip()
+                        ws.cell(row=row, column=5, value=items)
+                        ws.cell(row=row, column=5).font = Font(name='Calibri', size=11)
+                        ws.cell(row=row, column=5).border = styles.thin_border
+                        row += 1
+
+            row += 1
 
         # Panorama-Managed features
         pan_managed = sc.get('panorama_managed_features', [])
@@ -235,39 +304,16 @@ def generate(results: list, config_type: str = 'unknown', versions: dict = None,
     ws['A2'].font = styles.subtitle_font
     ws['A2'].alignment = Alignment(horizontal='center')
 
-    # Build result lookup — aggregate per feature (enabled if ANY are enabled)
-    from parsers.base import FeatureResult
+    # Group results by feature name (one row per source/device)
     result_groups = {}
     for r in results:
         if r.feature_name not in result_groups:
             result_groups[r.feature_name] = []
         result_groups[r.feature_name].append(r)
 
-    result_map = {}
-    for fname, rlist in result_groups.items():
-        enabled = any(r.enabled for r in rlist)
-        # Collect summaries from enabled results, deduplicate
-        summaries = []
-        sources = []
-        for r in rlist:
-            if r.enabled:
-                if r.summary not in summaries:
-                    summaries.append(r.summary)
-                if r.source not in sources:
-                    sources.append(r.source)
-        if not summaries:
-            summaries = [rlist[0].summary]
-            sources = [rlist[0].source]
-        result_map[fname] = FeatureResult(
-            feature_name=fname,
-            enabled=enabled,
-            summary='; '.join(summaries),
-            source=', '.join(sources),
-        )
-
-    # Quick reference by category
+    # Quick reference by category — one row per device/source per feature
     row = 4
-    headers = ['Category', 'Feature', 'Status', 'Summary', 'Count', 'Source']
+    headers = ['Category', 'Feature', 'Status', 'Device / Source', 'Configured Items', 'Count']
     for col, h in enumerate(headers, 1):
         ws.cell(row=row, column=col, value=h)
     styles.style_header_row(ws, row, len(headers))
@@ -288,8 +334,8 @@ def generate(results: list, config_type: str = 'unknown', versions: dict = None,
         row += 1
 
         for feat_name in features:
-            r = result_map.get(feat_name)
-            if r is None:
+            rlist = result_groups.get(feat_name)
+            if rlist is None:
                 # Feature parser not found — show as N/A
                 ws.cell(row=row, column=1, value='')
                 styles.style_data_cell(ws.cell(row=row, column=1), row)
@@ -305,43 +351,53 @@ def generate(results: list, config_type: str = 'unknown', versions: dict = None,
                 row += 1
                 continue
 
-            ws.cell(row=row, column=1, value='')
-            styles.style_data_cell(ws.cell(row=row, column=1), row)
+            # Separate enabled and disabled results
+            enabled_results = [r for r in rlist if r.enabled]
+            if not enabled_results:
+                # All disabled — show one row
+                ws.cell(row=row, column=1, value='')
+                styles.style_data_cell(ws.cell(row=row, column=1), row)
+                ws.cell(row=row, column=2, value=feat_name)
+                styles.style_data_cell(ws.cell(row=row, column=2), row)
+                styles.style_status_cell(ws.cell(row=row, column=3), False)
+                ws.cell(row=row, column=4, value=rlist[0].source)
+                styles.style_data_cell(ws.cell(row=row, column=4), row)
+                ws.cell(row=row, column=5, value='Not configured')
+                styles.style_data_cell(ws.cell(row=row, column=5), row)
+                ws.cell(row=row, column=6, value='')
+                styles.style_data_cell(ws.cell(row=row, column=6), row)
+                row += 1
+                continue
 
-            ws.cell(row=row, column=2, value=feat_name)
-            styles.style_data_cell(ws.cell(row=row, column=2), row)
+            # One row per enabled source/device
+            for r in enabled_results:
+                ws.cell(row=row, column=1, value='')
+                styles.style_data_cell(ws.cell(row=row, column=1), row)
+                ws.cell(row=row, column=2, value=feat_name)
+                styles.style_data_cell(ws.cell(row=row, column=2), row)
+                styles.style_status_cell(ws.cell(row=row, column=3), True)
 
-            styles.style_status_cell(ws.cell(row=row, column=3), r.enabled)
+                # Device/Source column
+                ws.cell(row=row, column=4, value=r.source)
+                styles.style_data_cell(ws.cell(row=row, column=4), row)
 
-            ws.cell(row=row, column=4, value=r.summary)
-            styles.style_data_cell(ws.cell(row=row, column=4), row)
+                # Configured Items — extract entry names from summary (format: "Source: Entry1, Entry2")
+                items = r.summary
+                if ':' in items:
+                    items = items.split(':', 1)[1].strip()
+                ws.cell(row=row, column=5, value=items)
+                styles.style_data_cell(ws.cell(row=row, column=5), row)
 
-            # Count — count entries from summary (Source: Entry1, Entry2; Source2: Entry3)
-            count = 0
-            if r.enabled and r.summary:
-                for segment in r.summary.split(';'):
-                    segment = segment.strip()
-                    if ':' in segment:
-                        entries_part = segment.split(':', 1)[1].strip()
-                        count += len([e.strip() for e in entries_part.split(',') if e.strip()])
-                    else:
-                        # Fallback: try to extract number
-                        for word in segment.split():
-                            if word.isdigit():
-                                count += int(word)
-                                break
-            ws.cell(row=row, column=5, value=count if count else '')
-            count_cell = ws.cell(row=row, column=5)
-            count_cell.alignment = Alignment(horizontal='center')
-            count_cell.border = styles.thin_border
-            if count and int(count) > 0:
-                count_cell.font = Font(name='Calibri', size=11, bold=True, color=styles.GREEN)
-            else:
-                count_cell.font = styles.data_font
-
-            ws.cell(row=row, column=6, value=r.source)
-            styles.style_data_cell(ws.cell(row=row, column=6), row)
-            row += 1
+                # Count
+                count = len([e.strip() for e in items.split(',') if e.strip()]) if items else 0
+                count_cell = ws.cell(row=row, column=6, value=count if count else '')
+                count_cell.alignment = Alignment(horizontal='center')
+                count_cell.border = styles.thin_border
+                if count > 0:
+                    count_cell.font = Font(name='Calibri', size=11, bold=True, color=styles.GREEN)
+                else:
+                    count_cell.font = styles.data_font
+                row += 1
 
         # Blank row between categories
         row += 1

@@ -18,7 +18,8 @@ class SDWANInterfaceProfilesParser(BaseParser):
             entries = self._find_all(c.xml_node, VSYS_XPATH)
 
             columns = ['Name', 'Link Type', 'Link Tag', 'Path Monitoring',
-                        'Probe Frequency', 'Failback Hold Time (s)',
+                        'Probe Frequency', 'Probe Idle Time',
+                        'Failback Hold Time (s)',
                         'Max Upload (Mbps)', 'Max Download (Mbps)']
 
             def build_row(entry):
@@ -28,6 +29,7 @@ class SDWANInterfaceProfilesParser(BaseParser):
                     self._find_text(entry, 'link-tag'),
                     self._find_text(entry, 'path-monitoring'),
                     self._find_text(entry, 'probe-frequency'),
+                    self._find_text(entry, 'probe-idle-time'),
                     self._find_text(entry, 'failback-hold-time'),
                     self._find_text(entry, 'maximum-upload'),
                     self._find_text(entry, 'maximum-download'),

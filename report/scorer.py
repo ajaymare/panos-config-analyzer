@@ -31,6 +31,7 @@ RECOMMENDATIONS = {
     'QoS Profiles': 'Apply QoS profiles to prioritize critical application traffic',
     'Link Management': 'Enable SD-WAN link settings on interfaces with gateway monitoring',
     'Certificate Profiles': 'Configure certificate profiles for secure device authentication',
+    'ZTP Support': 'Enable Zero Touch Provisioning for automated device onboarding',
 }
 
 

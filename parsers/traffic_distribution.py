@@ -24,7 +24,8 @@ class TrafficDistributionParser(BaseParser):
             else:
                 entries = self._find_all(c.xml_node, NGFW_XPATH)
 
-            columns = ['Name', 'Distribution Method', 'Link Tags', 'Weights']
+            columns = ['Name', 'Distribution Method', 'Link Tags', 'Weights',
+                        'Error Correction (FEC)', 'Packet Duplication']
 
             def build_row(entry):
                 # Distribution method is a text element
@@ -41,11 +42,25 @@ class TrafficDistributionParser(BaseParser):
                     if w:
                         weights.append(f"{tag_name}={w}")
 
+                # Error correction (FEC)
+                fec = self._find_text(entry, 'error-correction/enable', '')
+                if not fec:
+                    fec_node = entry.find('error-correction')
+                    fec = 'yes' if fec_node is not None else 'no'
+
+                # Packet duplication
+                pkt_dup = self._find_text(entry, 'packet-duplication/enable', '')
+                if not pkt_dup:
+                    pkt_dup_node = entry.find('packet-duplication')
+                    pkt_dup = 'yes' if pkt_dup_node is not None else 'no'
+
                 return [
                     self._get_name(entry),
                     method,
                     ', '.join(tags),
                     ', '.join(weights) if weights else '',
+                    fec,
+                    pkt_dup,
                 ]
 
             results.append(self._make_result(c.name, entries, columns, build_row))
