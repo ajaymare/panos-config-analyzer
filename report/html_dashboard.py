@@ -20,7 +20,7 @@ def _cat_color_css(hex_color):
     return f'#{hex_color}'
 
 
-def _score_card_html(cfg_name, cfg_type, scoring, versions=None):
+def _score_card_html(cfg_name, cfg_type, scoring, versions=None, serial=None):
     """Render a single config scorecard."""
     pct = scoring['percent']
     level = scoring['level']
@@ -30,16 +30,19 @@ def _score_card_html(cfg_name, cfg_type, scoring, versions=None):
     missing_count = len(scoring['missing_features'])
     pan_managed_count = len(scoring.get('panorama_managed_features', []))
 
-    # Version info
+    # Version info with device name
     version_html = ''
+    version_parts = []
     if versions:
-        parts = []
         if versions.get('panos_version'):
-            parts.append(f'PAN-OS {_esc(versions["panos_version"])}')
+            version_parts.append(f'PAN-OS {_esc(versions["panos_version"])}')
         if versions.get('sdwan_version'):
-            parts.append(f'SD-WAN Plugin {_esc(versions["sdwan_version"])}')
-        if parts:
-            version_html = f'<div class="config-version">{" | ".join(parts)}</div>'
+            version_parts.append(f'SD-WAN Plugin {_esc(versions["sdwan_version"])}')
+    if version_parts:
+        version_html = f'<div class="config-version">{" | ".join(version_parts)}</div>'
+    # Device name line
+    device_label = f'{_esc(cfg_name)}' + (f' ({_esc(serial)})' if serial else '')
+    version_html += f'<div class="config-device">Device: {device_label}</div>'
 
     # CSS-only circular progress
     circle = f'''
@@ -232,7 +235,8 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
 .config-name { font-size: 14px; margin: 12px 0 2px; padding: 0 12px;
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .config-type { font-size: 11px; color: #6b7a8d; margin-bottom: 4px; }
-.config-version { font-size: 10px; color: #0066cc; margin-bottom: 8px; font-weight: 600; }
+.config-version { font-size: 10px; color: #0066cc; margin-bottom: 2px; font-weight: 600; }
+.config-device { font-size: 10px; color: #1a2a44; margin-bottom: 8px; font-weight: 500; }
 .score-circle { width: 90px; height: 90px; margin: 0 auto; position: relative; }
 .score-circle svg { width: 100%; height: 100%; transform: rotate(-90deg); }
 .score-circle .bg { fill: none; stroke: #e8ecf0; stroke-width: 3; }
@@ -328,7 +332,7 @@ def generate_dashboard_fragment(configs_data):
 
     cards = ''.join(
         _score_card_html(s['filename'], s['config_type'], s['scoring'],
-                         versions=s.get('versions'))
+                         versions=s.get('versions'), serial=s.get('serial'))
         for s in scored
     )
     table = _comparison_table_html(scored)
@@ -389,7 +393,7 @@ def generate_dashboard(configs_data):
     # Scorecards
     cards = ''.join(
         _score_card_html(s['filename'], s['config_type'], s['scoring'],
-                         versions=s.get('versions'))
+                         versions=s.get('versions'), serial=s.get('serial'))
         for s in scored
     )
 

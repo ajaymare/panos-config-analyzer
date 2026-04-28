@@ -214,6 +214,8 @@ def parse():
                 configs_data[0]['config_type'],
                 versions=configs_data[0].get('versions'),
                 output_dir=session_dir,
+                filename=configs_data[0]['filename'],
+                serial=configs_data[0].get('serial'),
             )
         else:
             excel_path = excel_generator.generate_comparison(

@@ -191,6 +191,7 @@ def score_configs(configs_data):
             'config_type': cfg['config_type'],
             'scoring': scoring,
             'versions': cfg.get('versions'),
+            'serial': cfg.get('serial'),
             'results': cfg['results'],
         })
 

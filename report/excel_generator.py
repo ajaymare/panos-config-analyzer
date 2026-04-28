@@ -99,6 +99,7 @@ def _add_executive_summary(wb, scored_list, is_first_sheet=True):
         sc = s['scoring']
         name = s.get('filename', 'Config')
         cfg_type = s.get('config_type', 'unknown')
+        results = s.get('results', [])
 
         # ── Config Header Bar ──
         header_fill = PatternFill(start_color='1a2a44', end_color='1a2a44', fill_type='solid')
@@ -161,7 +162,7 @@ def _add_executive_summary(wb, scored_list, is_first_sheet=True):
         ws.row_dimensions[row + 1].height = 32
         row += 3
 
-        # Software version + Devices info row
+        # Software version + Device Name info row
         info_parts = []
         versions = s.get('versions')
         if versions:
@@ -170,26 +171,23 @@ def _add_executive_summary(wb, scored_list, is_first_sheet=True):
             if versions.get('sdwan_version'):
                 info_parts.append(f'SD-WAN Plugin {versions["sdwan_version"]}')
 
-        results = s.get('results', [])
-        sources = []
-        for r in results:
-            if r.source and r.source not in sources and r.enabled:
-                sources.append(r.source)
+        serial = s.get('serial', '')
+        device_label = name + (f' ({serial})' if serial else '')
 
-        if info_parts or sources:
+        if info_parts or device_label:
             if info_parts:
                 ws.cell(row=row, column=1, value='Software')
                 ws.cell(row=row, column=1).font = Font(name='Calibri', size=10, bold=True, color='6B7A8D')
+                ws.merge_cells(start_row=row, start_column=2, end_row=row, end_column=4)
                 ws.cell(row=row, column=2, value=' | '.join(info_parts))
                 ws.cell(row=row, column=2).font = Font(name='Calibri', size=10, color='0066CC')
                 ws.cell(row=row, column=2).border = styles.thin_border
-            if sources:
-                ws.cell(row=row, column=5, value='Devices')
-                ws.cell(row=row, column=5).font = Font(name='Calibri', size=10, bold=True, color='6B7A8D')
-                ws.merge_cells(start_row=row, start_column=6, end_row=row, end_column=8)
-                ws.cell(row=row, column=6, value=', '.join(sources))
-                ws.cell(row=row, column=6).font = Font(name='Calibri', size=10, color='1a2a44')
-                ws.cell(row=row, column=6).border = styles.thin_border
+            ws.cell(row=row, column=5, value='Device Name')
+            ws.cell(row=row, column=5).font = Font(name='Calibri', size=10, bold=True, color='6B7A8D')
+            ws.merge_cells(start_row=row, start_column=6, end_row=row, end_column=8)
+            ws.cell(row=row, column=6, value=device_label)
+            ws.cell(row=row, column=6).font = Font(name='Calibri', size=10, bold=True, color='1a2a44')
+            ws.cell(row=row, column=6).border = styles.thin_border
             row += 2
 
         # ── Section 3: Category Coverage Table ──
@@ -416,13 +414,13 @@ def _add_executive_summary(wb, scored_list, is_first_sheet=True):
     ws.freeze_panes = 'A4'
 
 
-def generate(results: list, config_type: str = 'unknown', versions: dict = None, output_dir: str = None) -> str:
+def generate(results: list, config_type: str = 'unknown', versions: dict = None, output_dir: str = None, filename: str = 'Config', serial: str = None) -> str:
     wb = Workbook()
 
     # ── Executive Summary Sheet ──
     from .scorer import score_config
     scoring = score_config(results)
-    _add_executive_summary(wb, [{'filename': 'Config', 'config_type': config_type, 'scoring': scoring, 'versions': versions, 'results': results}])
+    _add_executive_summary(wb, [{'filename': filename, 'config_type': config_type, 'scoring': scoring, 'versions': versions, 'serial': serial, 'results': results}])
 
     # ── Quick Reference Sheet ──
     ws = wb.create_sheet(title='Quick Reference')
