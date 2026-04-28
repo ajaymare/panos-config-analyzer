@@ -72,6 +72,17 @@ def _score_card_html(cfg_name, cfg_type, scoring, versions=None, serial=None):
     </div>'''
 
 
+def _get_feature_summary(results, feature_name):
+    """Get the summary text for a feature from results."""
+    for r in results:
+        if r.feature_name == feature_name and r.enabled:
+            return r.summary
+    return ''
+
+# Features that should show summary text instead of just a checkmark
+_SUMMARY_FEATURES = {'Topology Configured'}
+
+
 def _comparison_table_html(scored_configs):
     """Render the feature comparison table."""
     num = len(scored_configs)
@@ -88,7 +99,11 @@ def _comparison_table_html(scored_configs):
                 enabled = feat in s['scoring']['enabled_features']
                 pan_managed = feat in s['scoring'].get('panorama_managed_features', [])
                 if enabled:
-                    cells += '<td class="status-cell enabled">&#10003;</td>'
+                    if feat in _SUMMARY_FEATURES:
+                        summary = _get_feature_summary(s.get('results', []), feat)
+                        cells += f'<td class="status-cell enabled" title="{_esc(summary)}">{_esc(summary)}</td>'
+                    else:
+                        cells += '<td class="status-cell enabled">&#10003;</td>'
                 elif pan_managed:
                     cells += '<td class="status-cell panorama-managed" title="Configured via Panorama">&#9670;</td>'
                 else:

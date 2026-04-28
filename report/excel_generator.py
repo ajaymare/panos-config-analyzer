@@ -280,12 +280,19 @@ def _add_executive_summary(wb, scored_list, is_first_sheet=True):
             for cat_name, features in FEATURE_CATEGORIES.items():
                 cat_color = CAT_COLORS.get(cat_name, '2E86C1')
 
+                # Features that should show summary text (e.g., topology type)
+                _summary_features = {'Topology Configured'}
+
                 enabled_feats = []
                 gap_feats = []
                 for feat_name in features:
                     rlist = feat_groups.get(feat_name, [])
                     if any(r.enabled for r in rlist):
-                        enabled_feats.append(feat_name)
+                        if feat_name in _summary_features:
+                            summary = next((r.summary for r in rlist if r.enabled and r.summary), feat_name)
+                            enabled_feats.append(f'{feat_name} ({summary})')
+                        else:
+                            enabled_feats.append(feat_name)
                     else:
                         gap_feats.append(feat_name)
 
