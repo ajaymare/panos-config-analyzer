@@ -9,34 +9,26 @@ Docker-based tool with a Flask web UI that parses Palo Alto Panorama/NGFW config
 - **Panorama + NGFW**: Automatically detects config type, enumerates templates, template-stacks, and device-groups
 - **Panorama-Managed NGFW Detection**: Detects Panorama-managed NGFWs and correlates SD-WAN features from Panorama config
 - **Inline Dashboard**: HTML dashboard renders directly in the web UI after parsing — no separate file download
-- **15 SD-WAN Feature Parsers**: Comprehensive extraction of all SD-WAN related configuration
+- **38 SD-WAN Features Tracked**: Comprehensive extraction across 23 parsers covering 7 categories
 - **Software Version Detection**: Extracts PAN-OS version and SD-WAN plugin version from configs
-- **Deployment Scoring**: Automatic maturity grading based on enabled features (Basic: 1-4, Advanced: 5-9, Full: 10-15)
+- **Deployment Scoring**: Automatic maturity grading based on enabled features (Basic: 0-13, Advanced: 14-26, Full: 27-38)
 - **Excel Reports**: Executive Summary with scoring, device-level feature details + Quick Reference + detailed per-feature sheets + comparison views
 - **Sensitive Data Masking**: Selectively mask IPs, hostnames, device names, passwords, certificates, and network addresses
 - **Multi-User Support**: Per-session isolation — multiple users can parse configs simultaneously
 - **HTTPS Support**: Self-signed certificate with nginx reverse proxy on port 9443
 - **Dockerized**: Single container, no external dependencies
 
-## SD-WAN Features Parsed
+## 38 Tracked SD-WAN Features (7 Categories)
 
-| Feature | Description |
-|---------|-------------|
-| SD-WAN Interface Profiles | Link type, tag, bandwidth, path monitoring, probe idle time |
-| Path Quality Profiles | SLA thresholds: latency, jitter, packet loss |
-| Traffic Distribution | Algorithms: best-available, top-down, weighted, FEC, packet duplication |
-| SD-WAN Policy Rules | App-ID based path selection with traffic distribution |
-| VPN/IPSec Tunnels | IKE gateways, IPSec tunnels, crypto profiles, tunnel monitor |
-| VPN Clusters / Topology | Cluster config, hub/branch devices, BGP private AS, DIA failover, hub capacity, BGP policies, Prisma Access |
-| Routing (BGP/OSPF/ECMP) | Virtual routers, logical routers, VRFs, ECMP, fast failover, graceful restart, IPv6/OSPFv3 |
-| Policy-Based Forwarding | PBF rules with nexthop, monitoring |
-| QoS Profiles | QoS profiles and interface bindings |
-| Link Management | SD-WAN link settings on interfaces, gateways |
-| SaaS Quality Monitoring | Adaptive/static monitoring, probe intervals |
-| Digital Experience Monitoring | DEM probes and autonomous DEM |
-| Zones & Interfaces | Zones, ethernet, tunnel, aggregate, cellular interfaces |
-| Certificate Profiles | CA certs, CRL/OCSP settings |
-| ZTP Support | Zero Touch Provisioning version, service type, Panorama server, DDNS |
+| Category | Features |
+|----------|----------|
+| **SD-WAN Core** | SD-WAN Interface Profiles, App-ID Steering, Path Quality Metrics, Bandwidth Monitoring, Probe Idle Time, Failback Hold Time |
+| **Traffic Optimization** | Link Remediation (FEC), Packet Duplication |
+| **VPN & Topology** | VPN Automation, Topologies Supported, Hub Capacity, Prisma Access Hub, Sub-Second Failover, Tunnel Monitor |
+| **Routing** | Dynamic Routing, BGP AS Control, BGP Private AS, BGP Timer Profile, BGP Security Rule, BGP Routing Profiles, BGP Dampening, IPv6 Support, Multi-VR Support, Multicast Support, BFD Configuration, Advance Routing |
+| **Security & NAT** | SD-WAN Security Rules, SD-WAN NAT Policies |
+| **Monitoring & Reporting** | ADEM Integration, SD-WAN Reporting, Log Collection, Device Telemetry, Monitor Profiles |
+| **Network Infrastructure** | Sub/Agg Interfaces, Custom Applications, Template/Stack Mapping, Upstream NAT, ZTP Support |
 
 ## Quick Start
 
@@ -101,16 +93,15 @@ The inline dashboard displays immediately after parsing. The Excel report is ava
 
 ### Inline Dashboard
 - **Deployment Scorecards**: Per-config cards with maturity level (Basic/Advanced/Full), circular progress, PAN-OS and SD-WAN plugin versions
-- **Feature Comparison Table**: All 15 features grouped by category — green checkmark (enabled), amber diamond (Panorama-Managed), red X (missing)
-- **Feature Details**: Per-device breakdown showing configured items with device name, source, and item counts
+- **Feature Comparison Table**: All 38 features grouped by 7 categories — green checkmark (enabled), amber diamond (Panorama-Managed), red X (missing)
 - **Category Bar Charts**: Horizontal bars showing coverage percentage per category per config
 - **Gap Analysis**: Missing features with actionable recommendations for each config
 
 ### Excel Report
 
 #### Single Config
-- **Executive Summary**: Deployment maturity score, category breakdown with coverage %, device-level feature details, recommendations
-- **Quick Reference**: All 15 features grouped by category with one row per device/source per feature
+- **Executive Summary**: Deployment maturity score, category breakdown with coverage %, feature status with enabled counts, recommendations
+- **Quick Reference**: All 38 features grouped by 7 categories with one row per device/source per feature
 - **Detail Sheets**: One sheet per feature with full configuration data
 - **All Features**: Split into Enabled and Disabled sections with counts
 
@@ -134,7 +125,7 @@ parser/
 │   ├── base.py             # BaseParser ABC + FeatureResult
 │   ├── config_detector.py  # Panorama vs NGFW detection
 │   ├── registry.py         # Auto-discovers all parsers
-│   └── *.py                # 15 feature parsers
+│   └── *.py                # 23 feature parsers (38 tracked features)
 ├── api_client/
 │   └── connector.py        # pan-os-python SDK wrapper
 ├── report/

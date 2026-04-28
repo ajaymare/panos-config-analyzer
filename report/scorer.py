@@ -58,6 +58,52 @@ RECOMMENDATIONS = {
 }
 
 
+# Business impact descriptions for executive audience
+BUSINESS_IMPACT = {
+    'SD-WAN Interface Profiles': 'Enables WAN link classification and intelligent traffic steering',
+    'App-ID Steering': 'Routes business-critical apps over optimal paths automatically',
+    'Path Quality Metrics': 'Ensures SLA compliance with real-time path quality monitoring',
+    'Bandwidth Monitoring': 'Prevents bandwidth oversubscription and link saturation',
+    'Probe Idle Time': 'Reduces unnecessary probe traffic on idle links',
+    'Failback Hold Time': 'Prevents link flapping and ensures stable failover behavior',
+    'Link Remediation (FEC)': 'Recovers from packet loss without retransmission — critical for voice/video',
+    'Packet Duplication': 'Guarantees delivery for mission-critical traffic over unreliable links',
+    'VPN Automation': 'Automates VPN mesh creation — reduces manual config and human error',
+    'Topologies Supported': 'Enables flexible network designs (hub-spoke, full-mesh)',
+    'Hub Capacity': 'Scales hub/branch infrastructure for site growth',
+    'Prisma Access Hub': 'Extends SD-WAN to cloud-delivered security via Prisma Access',
+    'Sub-Second Failover': 'Minimizes downtime with near-instant path failover',
+    'Tunnel Monitor': 'Detects tunnel failures proactively before users are impacted',
+    'Dynamic Routing': 'Enables automatic route convergence and path redundancy',
+    'BGP AS Control': 'Provides granular control over BGP routing decisions',
+    'BGP Private AS': 'Prevents AS number leakage to external peers',
+    'BGP Timer Profile': 'Accelerates routing convergence after failures',
+    'BGP Security Rule': 'Secures BGP peering with access control policies',
+    'BGP Routing Profiles': 'Enables hybrid WAN routing with address-family filtering',
+    'BGP Dampening': 'Stabilizes routing by suppressing flapping routes',
+    'IPv6 Support': 'Future-proofs network with dual-stack IPv6 readiness',
+    'Multi-VR Support': 'Enables network segmentation with multiple virtual routers',
+    'Multicast Support': 'Supports multicast applications (video conferencing, streaming)',
+    'BFD Configuration': 'Sub-second link failure detection for faster convergence',
+    'Advance Routing': 'Enables logical routers and VRFs for advanced segmentation',
+    'SD-WAN Security Rules': 'Enforces security policies on SD-WAN traffic zones',
+    'SD-WAN NAT Policies': 'Handles address translation for SD-WAN tunnel traffic',
+    'ADEM Integration': 'End-to-end application performance visibility for troubleshooting',
+    'SD-WAN Reporting': 'Provides operational dashboards for app and link performance',
+    'Log Collection': 'Centralizes logs for compliance, audit, and troubleshooting',
+    'Device Telemetry': 'Enables proactive monitoring of device health and usage',
+    'Monitor Profiles': 'Configures health checks for tunnel and path monitoring',
+    'Sub/Agg Interfaces': 'Supports complex interface topologies (LAG, sub-interfaces)',
+    'Custom Applications': 'Identifies proprietary apps for accurate traffic steering',
+    'Template/Stack Mapping': 'Organizes device management at scale via templates',
+    'Upstream NAT': 'Supports SD-WAN deployment behind third-party NAT devices',
+    'ZTP Support': 'Automates branch device onboarding — zero touch provisioning',
+}
+
+# Priority: High for core SD-WAN and VPN features, Medium for others
+HIGH_PRIORITY_CATEGORIES = {'SD-WAN Core', 'VPN & Topology'}
+
+
 def score_config(results):
     """Score a single config's SD-WAN deployment maturity.
 

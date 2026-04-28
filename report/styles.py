@@ -77,6 +77,49 @@ def style_status_cell(cell, enabled):
     cell.alignment = Alignment(horizontal='center', vertical='center')
 
 
+# KPI styles
+kpi_label_font = Font(name='Calibri', size=10, bold=True, color='6B7A8D')
+kpi_label_align = Alignment(horizontal='center', vertical='center')
+kpi_value_font = Font(name='Calibri', size=18, bold=True, color=DARK_TEXT)
+kpi_value_align = Alignment(horizontal='center', vertical='center')
+
+# Level fills
+level_fills = {
+    'Full': PatternFill(start_color='1E8449', end_color='1E8449', fill_type='solid'),
+    'Advanced': PatternFill(start_color='B9770E', end_color='B9770E', fill_type='solid'),
+    'Basic': PatternFill(start_color='2E86C1', end_color='2E86C1', fill_type='solid'),
+}
+level_font = Font(name='Calibri', size=14, bold=True, color='FFFFFF')
+
+
+def progress_bar(percent, width=10):
+    """Return a text-based progress bar: ████████░░ (80%)."""
+    filled = round(percent / 100 * width)
+    empty = width - filled
+    return '\u2588' * filled + '\u2591' * empty
+
+
+def style_kpi_cell(ws, row, col, label, value, value_font=None, value_fill=None, merge_cols=2):
+    """Write a KPI label+value pair into two rows at (row, col)."""
+    # Label
+    cell_label = ws.cell(row=row, column=col, value=label)
+    cell_label.font = kpi_label_font
+    cell_label.alignment = kpi_label_align
+    cell_label.border = thin_border
+    if merge_cols > 1:
+        ws.merge_cells(start_row=row, start_column=col, end_row=row, end_column=col + merge_cols - 1)
+
+    # Value
+    cell_value = ws.cell(row=row + 1, column=col, value=value)
+    cell_value.font = value_font or kpi_value_font
+    cell_value.alignment = kpi_value_align
+    cell_value.border = thin_border
+    if value_fill:
+        cell_value.fill = value_fill
+    if merge_cols > 1:
+        ws.merge_cells(start_row=row + 1, start_column=col, end_row=row + 1, end_column=col + merge_cols - 1)
+
+
 def auto_width(ws, min_width=10, max_width=50):
     """Auto-adjust column widths based on content."""
     from openpyxl.cell.cell import MergedCell

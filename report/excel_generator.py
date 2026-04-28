@@ -63,220 +63,356 @@ CAT_COLORS = {
 def _add_executive_summary(wb, scored_list, is_first_sheet=True):
     """Add an Executive Summary sheet with deployment scoring and gap analysis.
 
+    Designed for executive and sales audiences — scannable in under 30 seconds.
+
     Args:
         wb: openpyxl Workbook
         scored_list: list of dicts from scorer.score_configs() or [scorer.score_config()]
         is_first_sheet: if True, use the active sheet; otherwise create new
     """
+    from .scorer import BUSINESS_IMPACT, HIGH_PRIORITY_CATEGORIES
+
     if is_first_sheet:
         ws = wb.active
         ws.title = 'Executive Summary'
     else:
         ws = wb.create_sheet(title='Executive Summary', index=0)
 
-    # Title
-    ws.merge_cells('A1:F1')
-    ws['A1'].value = 'SD-WAN Deployment Executive Summary'
-    ws['A1'].font = Font(name='Calibri', size=16, bold=True, color=styles.BLUE)
-    ws['A1'].alignment = Alignment(horizontal='center')
+    TOTAL_COLS = 8  # A through H
+    last_col = get_column_letter(TOTAL_COLS)
 
-    ws.merge_cells('A2:F2')
-    ws['A2'].value = f'Generated: {datetime.now().strftime("%Y-%m-%d %H:%M:%S")}'
+    # ── Section 1: Title Banner ──
+    ws.merge_cells(f'A1:{last_col}1')
+    ws['A1'].value = 'SD-WAN Deployment Assessment Report'
+    ws['A1'].font = Font(name='Calibri', size=18, bold=True, color=styles.BLUE)
+    ws['A1'].alignment = Alignment(horizontal='center', vertical='center')
+    ws.row_dimensions[1].height = 36
+
+    ws.merge_cells(f'A2:{last_col}2')
+    ws['A2'].value = f'Generated: {datetime.now().strftime("%B %d, %Y at %I:%M %p")}'
     ws['A2'].font = styles.subtitle_font
     ws['A2'].alignment = Alignment(horizontal='center')
 
     row = 4
 
-    # Per-config scoring
     for s in scored_list:
         sc = s['scoring']
         name = s.get('filename', 'Config')
         cfg_type = s.get('config_type', 'unknown')
 
-        # Config header
+        # ── Config Header Bar ──
         header_fill = PatternFill(start_color='1a2a44', end_color='1a2a44', fill_type='solid')
-        header_font = Font(name='Calibri', size=12, bold=True, color='FFFFFF')
-        for col in range(1, 7):
+        header_font = Font(name='Calibri', size=13, bold=True, color='FFFFFF')
+        for col in range(1, TOTAL_COLS + 1):
             cell = ws.cell(row=row, column=col)
             cell.fill = header_fill
             cell.font = header_font
             cell.border = styles.thin_border
         ws.cell(row=row, column=1, value=f'{name} ({cfg_type.upper()})')
+        ws.row_dimensions[row].height = 28
         row += 1
 
-        # Software version info
-        versions = s.get('versions')
-        if versions:
-            version_parts = []
-            if versions.get('panos_version'):
-                version_parts.append(f'PAN-OS {versions["panos_version"]}')
-            if versions.get('sdwan_version'):
-                version_parts.append(f'SD-WAN Plugin {versions["sdwan_version"]}')
-            if version_parts:
-                ws.cell(row=row, column=1, value='Software Version')
-                ws.cell(row=row, column=1).font = Font(name='Calibri', size=11, bold=True)
-                ws.cell(row=row, column=2, value=' | '.join(version_parts))
-                ws.cell(row=row, column=2).font = Font(name='Calibri', size=11, color='0066CC')
-                ws.cell(row=row, column=2).border = styles.thin_border
-                row += 1
-
-        # Devices/Sources info — extract unique sources from results
-        results = s.get('results', [])
-        if results:
-            sources = []
-            for r in results:
-                if r.source and r.source not in sources and r.enabled:
-                    sources.append(r.source)
-            if sources:
-                ws.cell(row=row, column=1, value='Devices / Sources')
-                ws.cell(row=row, column=1).font = Font(name='Calibri', size=11, bold=True)
-                ws.cell(row=row, column=2, value=', '.join(sources))
-                ws.cell(row=row, column=2).font = Font(name='Calibri', size=11, color='1a2a44')
-                ws.cell(row=row, column=2).border = styles.thin_border
-                row += 1
-
-        # Score and level
+        # ── Section 2: KPI Scorecard ──
         level_colors = {'Full': '1E8449', 'Advanced': 'B9770E', 'Basic': '2E86C1'}
         level_color = level_colors.get(sc['level'], '2E86C1')
+
+        # KPI labels row
+        kpi_labels = [
+            ('Maturity Level', 1, 2),
+            ('Overall Score', 3, 2),
+            ('Features Enabled', 5, 2),
+            ('Gaps Identified', 7, 2),
+        ]
+        for label, col, span in kpi_labels:
+            styles.style_kpi_cell(ws, row, col, label, '', merge_cols=span)
+
+        # KPI values row (row+1 is set by style_kpi_cell)
+        # Maturity Level
         level_fill = PatternFill(start_color=level_color, end_color=level_color, fill_type='solid')
+        c = ws.cell(row=row + 1, column=1, value=sc['level'])
+        c.font = styles.level_font
+        c.fill = level_fill
+        c.alignment = styles.kpi_value_align
+        c.border = styles.thin_border
+        ws.merge_cells(start_row=row + 1, start_column=1, end_row=row + 1, end_column=2)
 
-        ws.cell(row=row, column=1, value='Deployment Maturity')
-        ws.cell(row=row, column=1).font = Font(name='Calibri', size=11, bold=True)
-        cell = ws.cell(row=row, column=2, value=sc['level'])
-        cell.fill = level_fill
-        cell.font = Font(name='Calibri', size=11, bold=True, color='FFFFFF')
-        cell.alignment = Alignment(horizontal='center')
-        cell.border = styles.thin_border
+        # Overall Score
+        c = ws.cell(row=row + 1, column=3, value=f'{sc["score"]} / {sc["total"]}  ({sc["percent"]}%)')
+        c.font = Font(name='Calibri', size=16, bold=True, color=level_color)
+        c.alignment = styles.kpi_value_align
+        c.border = styles.thin_border
+        ws.merge_cells(start_row=row + 1, start_column=3, end_row=row + 1, end_column=4)
 
-        ws.cell(row=row, column=3, value='Score')
-        ws.cell(row=row, column=3).font = Font(name='Calibri', size=11, bold=True)
-        ws.cell(row=row, column=4, value=f'{sc["score"]}/{sc["total"]} ({sc["percent"]}%)')
-        ws.cell(row=row, column=4).font = Font(name='Calibri', size=11, bold=True, color=level_color)
-        row += 2
+        # Features Enabled
+        c = ws.cell(row=row + 1, column=5, value=sc['score'])
+        c.font = Font(name='Calibri', size=18, bold=True, color='1E8449')
+        c.alignment = styles.kpi_value_align
+        c.border = styles.thin_border
+        ws.merge_cells(start_row=row + 1, start_column=5, end_row=row + 1, end_column=6)
 
-        # Category breakdown with coverage
-        cat_headers = ['Category', 'Enabled', 'Total', 'Coverage']
+        # Gaps
+        gap_count = sc['total'] - sc['score']
+        c = ws.cell(row=row + 1, column=7, value=gap_count)
+        c.font = Font(name='Calibri', size=18, bold=True, color='C0392B' if gap_count > 0 else '1E8449')
+        c.alignment = styles.kpi_value_align
+        c.border = styles.thin_border
+        ws.merge_cells(start_row=row + 1, start_column=7, end_row=row + 1, end_column=8)
+
+        ws.row_dimensions[row + 1].height = 32
+        row += 3
+
+        # Software version + Devices info row
+        info_parts = []
+        versions = s.get('versions')
+        if versions:
+            if versions.get('panos_version'):
+                info_parts.append(f'PAN-OS {versions["panos_version"]}')
+            if versions.get('sdwan_version'):
+                info_parts.append(f'SD-WAN Plugin {versions["sdwan_version"]}')
+
+        results = s.get('results', [])
+        sources = []
+        for r in results:
+            if r.source and r.source not in sources and r.enabled:
+                sources.append(r.source)
+
+        if info_parts or sources:
+            if info_parts:
+                ws.cell(row=row, column=1, value='Software')
+                ws.cell(row=row, column=1).font = Font(name='Calibri', size=10, bold=True, color='6B7A8D')
+                ws.cell(row=row, column=2, value=' | '.join(info_parts))
+                ws.cell(row=row, column=2).font = Font(name='Calibri', size=10, color='0066CC')
+                ws.cell(row=row, column=2).border = styles.thin_border
+            if sources:
+                ws.cell(row=row, column=5, value='Devices')
+                ws.cell(row=row, column=5).font = Font(name='Calibri', size=10, bold=True, color='6B7A8D')
+                ws.merge_cells(start_row=row, start_column=6, end_row=row, end_column=8)
+                ws.cell(row=row, column=6, value=', '.join(sources))
+                ws.cell(row=row, column=6).font = Font(name='Calibri', size=10, color='1a2a44')
+                ws.cell(row=row, column=6).border = styles.thin_border
+            row += 2
+
+        # ── Section 3: Category Coverage Table ──
+        cat_headers = ['Category', 'Enabled', 'Total', 'Coverage', 'Progress', 'Status']
         for col, h in enumerate(cat_headers, 1):
             ws.cell(row=row, column=col, value=h)
         styles.style_header_row(ws, row, len(cat_headers))
         row += 1
 
         for cat_name, cat_data in sc['category_scores'].items():
+            pct = cat_data['percent']
             cat_color = CAT_COLORS.get(cat_name, '2E86C1')
-            ws.cell(row=row, column=1, value=cat_name)
-            styles.style_data_cell(ws.cell(row=row, column=1), row)
 
-            ws.cell(row=row, column=2, value=cat_data['enabled'])
-            ws.cell(row=row, column=2).alignment = Alignment(horizontal='center')
-            ws.cell(row=row, column=2).border = styles.thin_border
+            # Category name with colored left border
+            c = ws.cell(row=row, column=1, value=cat_name)
+            c.font = Font(name='Calibri', size=11, bold=True, color=cat_color)
+            c.border = Border(
+                left=Side(style='medium', color=cat_color),
+                right=Side(style='thin', color=styles.BORDER_COLOR),
+                top=Side(style='thin', color=styles.BORDER_COLOR),
+                bottom=Side(style='thin', color=styles.BORDER_COLOR),
+            )
+
+            # Enabled count
+            c = ws.cell(row=row, column=2, value=cat_data['enabled'])
+            c.alignment = Alignment(horizontal='center')
+            c.border = styles.thin_border
             if cat_data['enabled'] == cat_data['total']:
-                ws.cell(row=row, column=2).font = Font(name='Calibri', size=11, bold=True, color='1E8449')
+                c.font = Font(name='Calibri', size=11, bold=True, color='1E8449')
             elif cat_data['enabled'] > 0:
-                ws.cell(row=row, column=2).font = Font(name='Calibri', size=11, color='B9770E')
+                c.font = Font(name='Calibri', size=11, bold=True, color='B9770E')
             else:
-                ws.cell(row=row, column=2).font = Font(name='Calibri', size=11, color='C0392B')
+                c.font = Font(name='Calibri', size=11, color='C0392B')
 
-            ws.cell(row=row, column=3, value=cat_data['total'])
-            ws.cell(row=row, column=3).alignment = Alignment(horizontal='center')
-            ws.cell(row=row, column=3).border = styles.thin_border
+            # Total
+            c = ws.cell(row=row, column=3, value=cat_data['total'])
+            c.alignment = Alignment(horizontal='center')
+            c.border = styles.thin_border
 
-            ws.cell(row=row, column=4, value=f'{cat_data["percent"]}%')
-            ws.cell(row=row, column=4).alignment = Alignment(horizontal='center')
-            ws.cell(row=row, column=4).border = styles.thin_border
+            # Coverage %
+            c = ws.cell(row=row, column=4, value=f'{pct}%')
+            c.alignment = Alignment(horizontal='center')
+            c.border = styles.thin_border
+            if pct >= 80:
+                c.font = Font(name='Calibri', size=11, bold=True, color='1E8449')
+            elif pct >= 40:
+                c.font = Font(name='Calibri', size=11, bold=True, color='B9770E')
+            else:
+                c.font = Font(name='Calibri', size=11, bold=True, color='C0392B')
+
+            # Progress bar
+            c = ws.cell(row=row, column=5, value=styles.progress_bar(pct))
+            c.font = Font(name='Consolas', size=10, color=cat_color)
+            c.alignment = Alignment(horizontal='left', vertical='center')
+            c.border = styles.thin_border
+
+            # Status
+            if pct == 100:
+                status_text = 'Complete'
+                status_color = '1E8449'
+            elif pct > 0:
+                status_text = 'Partial'
+                status_color = 'B9770E'
+            else:
+                status_text = 'Not Started'
+                status_color = 'C0392B'
+            c = ws.cell(row=row, column=6, value=status_text)
+            c.font = Font(name='Calibri', size=10, bold=True, color=status_color)
+            c.alignment = Alignment(horizontal='center')
+            c.border = styles.thin_border
             row += 1
 
         row += 1
 
-        # Feature Details — show what's configured per device/source
-        results = s.get('results', [])
+        # ── Section 4: Compact Feature Status by Category ──
         if results:
-            # Group results by feature
             feat_groups = {}
             for r in results:
                 if r.feature_name not in feat_groups:
                     feat_groups[r.feature_name] = []
                 feat_groups[r.feature_name].append(r)
 
-            detail_headers = ['Device', 'Feature', 'Status', 'Enabled Count']
-            for col, h in enumerate(detail_headers, 1):
+            feat_headers = ['Category', 'Enabled Features', 'Gaps', 'Coverage']
+            for col, h in enumerate(feat_headers, 1):
                 ws.cell(row=row, column=col, value=h)
-            styles.style_header_row(ws, row, len(detail_headers))
+            styles.style_header_row(ws, row, len(feat_headers))
+            # Widen columns 2-3 by merging display area
             row += 1
 
             for cat_name, features in FEATURE_CATEGORIES.items():
                 cat_color = CAT_COLORS.get(cat_name, '2E86C1')
-                cat_fill = PatternFill(start_color=cat_color, end_color=cat_color, fill_type='solid')
-                cat_font = Font(name='Calibri', size=11, bold=True, color='FFFFFF')
-                for col in range(1, len(detail_headers) + 1):
-                    cell = ws.cell(row=row, column=col)
-                    cell.fill = cat_fill
-                    cell.font = cat_font
-                    cell.border = styles.thin_border
-                ws.cell(row=row, column=1, value=cat_name)
-                row += 1
 
+                enabled_feats = []
+                gap_feats = []
                 for feat_name in features:
                     rlist = feat_groups.get(feat_name, [])
-                    enabled_count = sum(1 for r in rlist if r.enabled)
-
-                    ws.cell(row=row, column=1, value=name)
-                    styles.style_data_cell(ws.cell(row=row, column=1), row)
-                    ws.cell(row=row, column=2, value=feat_name)
-                    styles.style_data_cell(ws.cell(row=row, column=2), row)
-                    styles.style_status_cell(ws.cell(row=row, column=3), enabled_count > 0)
-
-                    ws.cell(row=row, column=4, value=enabled_count)
-                    ws.cell(row=row, column=4).alignment = Alignment(horizontal='center')
-                    ws.cell(row=row, column=4).border = styles.thin_border
-                    if enabled_count > 0:
-                        ws.cell(row=row, column=4).font = Font(name='Calibri', size=11, bold=True, color='1E8449')
+                    if any(r.enabled for r in rlist):
+                        enabled_feats.append(feat_name)
                     else:
-                        ws.cell(row=row, column=4).font = Font(name='Calibri', size=11, color='C0392B')
-                    row += 1
+                        gap_feats.append(feat_name)
+
+                pct = round(len(enabled_feats) / len(features) * 100) if features else 0
+
+                # Category
+                c = ws.cell(row=row, column=1, value=cat_name)
+                c.font = Font(name='Calibri', size=10, bold=True, color=cat_color)
+                c.border = Border(
+                    left=Side(style='medium', color=cat_color),
+                    right=Side(style='thin', color=styles.BORDER_COLOR),
+                    top=Side(style='thin', color=styles.BORDER_COLOR),
+                    bottom=Side(style='thin', color=styles.BORDER_COLOR),
+                )
+                c.alignment = Alignment(vertical='top', wrap_text=True)
+
+                # Enabled features
+                c = ws.cell(row=row, column=2, value=', '.join(enabled_feats) if enabled_feats else '—')
+                c.font = Font(name='Calibri', size=10, color='1E8449' if enabled_feats else '999999')
+                c.alignment = Alignment(vertical='top', wrap_text=True)
+                c.border = styles.thin_border
+
+                # Gaps
+                c = ws.cell(row=row, column=3, value=', '.join(gap_feats) if gap_feats else '—')
+                c.font = Font(name='Calibri', size=10, color='C0392B' if gap_feats else '999999')
+                c.alignment = Alignment(vertical='top', wrap_text=True)
+                c.border = styles.thin_border
+
+                # Coverage
+                c = ws.cell(row=row, column=4, value=f'{len(enabled_feats)}/{len(features)}')
+                c.alignment = Alignment(horizontal='center', vertical='top')
+                c.border = styles.thin_border
+                if pct >= 80:
+                    c.font = Font(name='Calibri', size=10, bold=True, color='1E8449')
+                elif pct >= 40:
+                    c.font = Font(name='Calibri', size=10, bold=True, color='B9770E')
+                else:
+                    c.font = Font(name='Calibri', size=10, bold=True, color='C0392B')
+
+                row += 1
 
             row += 1
 
-        # Panorama-Managed features
+        # ── Section 5: Panorama-Managed Features ──
         pan_managed = sc.get('panorama_managed_features', [])
         if pan_managed:
-            ws.cell(row=row, column=1, value='Panorama-Managed Features')
-            ws.cell(row=row, column=1).font = Font(name='Calibri', size=11, bold=True, color='B9770E')
-            row += 1
-            for feat in pan_managed:
-                ws.cell(row=row, column=1, value=f'  {feat}')
-                ws.cell(row=row, column=1).font = Font(name='Calibri', size=11, color='B9770E')
-                ws.cell(row=row, column=1).border = styles.thin_border
-                ws.cell(row=row, column=2, value='Configured via Panorama')
-                ws.cell(row=row, column=2).font = Font(name='Calibri', size=11, color='B9770E')
-                ws.cell(row=row, column=2).border = styles.thin_border
-                row += 1
+            pan_fill = PatternFill(start_color='B9770E', end_color='B9770E', fill_type='solid')
+            pan_font = Font(name='Calibri', size=11, bold=True, color='FFFFFF')
+            for col in range(1, 5):
+                cell = ws.cell(row=row, column=col)
+                cell.fill = pan_fill
+                cell.font = pan_font
+                cell.border = styles.thin_border
+            ws.cell(row=row, column=1, value=f'Panorama-Managed Features ({len(pan_managed)})')
             row += 1
 
-        # Missing features / recommendations
+            ws.cell(row=row, column=1, value=', '.join(pan_managed))
+            ws.cell(row=row, column=1).font = Font(name='Calibri', size=10, color='B9770E')
+            ws.cell(row=row, column=1).alignment = Alignment(wrap_text=True)
+            ws.cell(row=row, column=1).border = styles.thin_border
+            ws.merge_cells(start_row=row, start_column=1, end_row=row, end_column=4)
+            row += 2
+
+        # ── Section 6: Key Recommendations ──
         if sc['missing_features']:
-            ws.cell(row=row, column=1, value='Recommendations')
-            ws.cell(row=row, column=1).font = Font(name='Calibri', size=11, bold=True, color='C0392B')
+            rec_fill = PatternFill(start_color='C0392B', end_color='C0392B', fill_type='solid')
+            rec_font = Font(name='Calibri', size=11, bold=True, color='FFFFFF')
+            for col in range(1, 5):
+                cell = ws.cell(row=row, column=col)
+                cell.fill = rec_fill
+                cell.font = rec_font
+                cell.border = styles.thin_border
+            ws.cell(row=row, column=1, value='Key Recommendations')
             row += 1
-            rec_headers = ['Missing Feature', 'Recommendation']
+
+            rec_headers = ['Priority', 'Missing Feature', 'Action', 'Business Impact']
             for col, h in enumerate(rec_headers, 1):
                 ws.cell(row=row, column=col, value=h)
             styles.style_header_row(ws, row, len(rec_headers))
             row += 1
 
+            # Build feature-to-category mapping for priority
+            feat_to_cat = {}
+            for cat_name, feats in FEATURE_CATEGORIES.items():
+                for f in feats:
+                    feat_to_cat[f] = cat_name
+
             for feat, rec in zip(sc['missing_features'], sc['recommendations']):
-                ws.cell(row=row, column=1, value=feat)
-                styles.style_data_cell(ws.cell(row=row, column=1), row)
-                ws.cell(row=row, column=2, value=rec)
+                cat = feat_to_cat.get(feat, '')
+                priority = 'High' if cat in HIGH_PRIORITY_CATEGORIES else 'Medium'
+                impact = BUSINESS_IMPACT.get(feat, '')
+
+                # Priority with color
+                c = ws.cell(row=row, column=1, value=priority)
+                c.alignment = Alignment(horizontal='center')
+                c.border = styles.thin_border
+                if priority == 'High':
+                    c.font = Font(name='Calibri', size=10, bold=True, color='C0392B')
+                    c.fill = PatternFill(start_color='F8D7DA', end_color='F8D7DA', fill_type='solid')
+                else:
+                    c.font = Font(name='Calibri', size=10, bold=True, color='B9770E')
+                    c.fill = PatternFill(start_color='FFF3CD', end_color='FFF3CD', fill_type='solid')
+
+                # Feature name
+                ws.cell(row=row, column=2, value=feat)
                 styles.style_data_cell(ws.cell(row=row, column=2), row)
+
+                # Action
+                ws.cell(row=row, column=3, value=rec)
+                styles.style_data_cell(ws.cell(row=row, column=3), row)
+
+                # Business impact
+                ws.cell(row=row, column=4, value=impact)
+                ws.cell(row=row, column=4).font = Font(name='Calibri', size=10, italic=True, color='1a2a44')
+                ws.cell(row=row, column=4).alignment = Alignment(wrap_text=True, vertical='center')
+                ws.cell(row=row, column=4).border = styles.thin_border
                 row += 1
         elif not pan_managed:
-            ws.cell(row=row, column=1, value='All SD-WAN features are configured.')
-            ws.cell(row=row, column=1).font = Font(name='Calibri', size=11, bold=True, color='1E8449')
+            ws.cell(row=row, column=1, value='All SD-WAN features are fully configured.')
+            ws.cell(row=row, column=1).font = Font(name='Calibri', size=12, bold=True, color='1E8449')
             row += 1
 
-        row += 2  # Space between configs
+        row += 3  # Space between configs
 
-    styles.auto_width(ws, min_width=14, max_width=60)
+    styles.auto_width(ws, min_width=14, max_width=55)
     ws.freeze_panes = 'A4'
 
 

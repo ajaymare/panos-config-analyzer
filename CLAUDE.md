@@ -7,13 +7,13 @@ PAN-OS SD-WAN Configuration Parser — a Docker-based Flask tool that parses Pal
 ## Architecture
 
 - **Flask app** (`app.py`): Routes for single/multi-file upload, orchestrates parsing pipeline, returns JSON (dashboard HTML + Excel download URL)
-- **Parsers** (`parsers/`): 15 feature-specific modules, each a `BaseParser` subclass with `extract()` method
+- **Parsers** (`parsers/`): 23 feature-specific modules (38 tracked features), each a `BaseParser` subclass with `extract()` method
 - **Config Detector** (`parsers/config_detector.py`): Auto-detects Panorama vs NGFW, enumerates templates/device-groups/shared, detects Panorama-managed NGFWs
 - **Registry** (`parsers/registry.py`): Auto-discovers all `BaseParser` subclasses via `pkgutil`
 - **Report** (`report/excel_generator.py`): Two report modes, both with Executive Summary sheet:
   - `generate()` — Single config: Executive Summary + Quick Reference + detail sheets + All Features
   - `generate_comparison()` — Multi config: Executive Summary + Comparison Summary + merged detail sheets + All Features
-- **HTML Dashboard** (`report/html_dashboard.py`): Inline dashboard fragment with scorecards, comparison table, feature details (device-level breakdown), category charts, gap analysis
+- **HTML Dashboard** (`report/html_dashboard.py`): Inline dashboard fragment with scorecards, comparison table, category charts, gap analysis
 - **Scorer** (`report/scorer.py`): Deployment maturity scoring (Basic/Advanced/Full) with category breakdowns, Panorama-managed feature tracking, and recommendations
 - **Masker** (`report/masker.py`): Sensitive data masking with 6 categories (IPs, hostnames, devices, passwords, certs, network addresses)
 
@@ -47,14 +47,18 @@ docker run -d --name panos-parser -p 8080:8080 -p 9443:9443 ajaymare/panos-confi
 
 ## Development Notes
 
+### 38 Tracked Features (7 Categories)
+Features are defined in `FEATURE_CATEGORIES` in `report/excel_generator.py`. Categories: SD-WAN Core (6), Traffic Optimization (2), VPN & Topology (6), Routing (12), Security & NAT (2), Monitoring & Reporting (5), Network Infrastructure (5).
+
 ### Enhanced Parser Sub-Features
-Several parsers extract additional SD-WAN sub-features beyond the primary feature:
-- **VPN Topology**: BGP private AS, hub/branch capacity, DIA VPN failover, BGP policies, Panorama connectivity (Prisma Access)
-- **Routing**: Fast external failover, graceful restart timers, OSPFv3/IPv6 support
-- **Traffic Distribution**: Error correction (FEC), packet duplication
-- **SD-WAN Interface Profiles**: Probe idle time
-- **VPN Tunnels**: Tunnel monitor (enable + destination IP)
-- **ZTP Support**: ZTP version, service type, Panorama server, DDNS
+Many parsers emit multiple `FeatureResult` objects — a primary feature plus sub-features for scoring:
+- **VPN Topology** (`VPN Automation`): + Topologies Supported, Hub Capacity, Prisma Access Hub, Sub-Second Failover, BGP AS Control, BGP Private AS, BGP Security Rule, Multi-VR Support
+- **Routing** (`Dynamic Routing`): + BGP Timer Profile, IPv6 Support, Multicast Support, BFD Configuration, BGP Dampening, BGP Routing Profiles
+- **SD-WAN Interface Profiles**: + Bandwidth Monitoring, Probe Idle Time, Failback Hold Time
+- **Traffic Distribution**: + Link Remediation (FEC), Packet Duplication
+- **VPN Tunnels**: + Tunnel Monitor
+- **Link Management**: + Upstream NAT
+- **Device Telemetry**: + Advance Routing
 
 ### Summary Format
 Parser summaries use `"Source: Entry1, Entry2"` format (set in `_make_result()` in `base.py`). Quick Reference shows one row per source/device per feature. Executive Summary and dashboard Feature Details tables include a Device column showing the config filename.
@@ -88,8 +92,8 @@ Parsers iterate containers and search relative XPaths. Some parsers (VPN topolog
 - `/parse` returns JSON: `{ dashboard_html, excel_url, excel_filename }`
 - Dashboard HTML fragment is injected inline in the web UI — no separate file download
 - Excel report served via `/download/<session_id>/<filename>` with per-session isolation
-- `report/scorer.py` scores configs by counting enabled features out of 15: Basic (1-4), Advanced (5-9), Full (10-15)
-- Per-category breakdown (SD-WAN Core, VPN & Topology, Routing, Monitoring, Network Infrastructure)
+- `report/scorer.py` scores configs by counting enabled features out of 38: Basic (0-13), Advanced (14-26), Full (27-38)
+- Per-category breakdown (SD-WAN Core, Traffic Optimization, VPN & Topology, Routing, Security & NAT, Monitoring & Reporting, Network Infrastructure)
 - Panorama-managed features tracked separately — count toward score, shown in amber
 - Three status indicators in dashboard: green checkmark (enabled), amber diamond (Panorama-Managed), red X (missing)
 - Software version info (PAN-OS version, SD-WAN plugin version) shown in scorecards and Excel
