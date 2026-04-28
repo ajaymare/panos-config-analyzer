@@ -8,15 +8,16 @@ for feats in FEATURE_CATEGORIES.values():
 
 TOTAL_FEATURES = len(ALL_FEATURES)
 
-# Maturity levels (adjusted for 23 features)
+# Maturity levels (adjusted for 24 features)
 LEVELS = [
-    (16, 'Full', '#1E8449'),
-    (8, 'Advanced', '#B9770E'),
+    (17, 'Full', '#1E8449'),
+    (9, 'Advanced', '#B9770E'),
     (0, 'Basic', '#2E86C1'),
 ]
 
 # Recommendations per missing feature
 RECOMMENDATIONS = {
+    'SD-WAN Interface Profiles': 'Define interface profiles to classify WAN links by type and tag',
     'App-ID Steering': 'Create App-ID based SD-WAN policies for intelligent path selection',
     'Path Quality Metrics': 'Add SLA thresholds (latency, jitter, packet loss) for path selection',
     'Bandwidth Monitoring': 'Define interface profiles with bandwidth limits for WAN link monitoring',

@@ -14,7 +14,7 @@ REPORT_DIR = app_config.REPORT_DIR
 # Category grouping for quick reference
 FEATURE_CATEGORIES = {
     'SD-WAN Core': [
-        'App-ID Steering', 'Path Quality Metrics',
+        'SD-WAN Interface Profiles', 'App-ID Steering', 'Path Quality Metrics',
         'Bandwidth Monitoring', 'Probe Idle Time', 'Failback Hold Time',
     ],
     'Traffic Optimization': [

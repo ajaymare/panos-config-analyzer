@@ -332,7 +332,6 @@ def generate_dashboard_fragment(configs_data):
         for s in scored
     )
     table = _comparison_table_html(scored)
-    details = _feature_details_html(configs_data)
     gaps = _gap_analysis_html(scored)
     bars = _category_bars_html(scored)
 
@@ -356,11 +355,6 @@ def generate_dashboard_fragment(configs_data):
     <div class="section">
       <div class="section-title">Feature {('Comparison' if is_comparison else 'Summary')}</div>
       {table}
-    </div>
-
-    <div class="section">
-      <div class="section-title">Feature Details</div>
-      {details}
     </div>
 
     <div class="section">
@@ -402,9 +396,6 @@ def generate_dashboard(configs_data):
     # Comparison table
     table = _comparison_table_html(scored)
 
-    # Feature details
-    details = _feature_details_html(configs_data)
-
     # Gap analysis
     gaps = _gap_analysis_html(scored)
 
@@ -442,11 +433,6 @@ def generate_dashboard(configs_data):
   <div class="section">
     <div class="section-title">Feature {('Comparison' if is_comparison else 'Summary')}</div>
     {table}
-  </div>
-
-  <div class="section">
-    <div class="section-title">Feature Details</div>
-    {details}
   </div>
 
   <div class="section">

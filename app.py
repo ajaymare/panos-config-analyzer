@@ -17,7 +17,7 @@ app.config['MAX_CONTENT_LENGTH'] = app_config.MAX_CONTENT_LENGTH
 
 # SD-WAN features that are managed by Panorama (not present in NGFW exports)
 _PANORAMA_SDWAN_FEATURES = {
-    'App-ID Steering', 'Path Quality Metrics',
+    'SD-WAN Interface Profiles', 'App-ID Steering', 'Path Quality Metrics',
     'Bandwidth Monitoring', 'Probe Idle Time', 'Failback Hold Time',
     'Link Remediation (FEC)', 'Packet Duplication',
     'VPN Automation', 'Topologies Supported',
