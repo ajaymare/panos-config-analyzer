@@ -60,8 +60,20 @@ Many parsers emit multiple `FeatureResult` objects — a primary feature plus su
 - **Link Management**: + Upstream NAT
 - **Device Telemetry**: + Advance Routing
 
+### Executive Summary (Excel)
+Designed for executive/sales audiences with:
+- KPI scorecard: maturity level, overall score, enabled count, gaps count
+- Device name with serial number + software versions
+- Category coverage table with text progress bars and Complete/Partial/Not Started status
+- Compact feature status: 7 category rows (not 38 individual rows) showing enabled features and gaps
+- Prioritized recommendations with High/Medium priority and business impact descriptions
+- `BUSINESS_IMPACT` dict and `HIGH_PRIORITY_CATEGORIES` in `report/scorer.py`
+
 ### Summary Format
-Parser summaries use `"Source: Entry1, Entry2"` format (set in `_make_result()` in `base.py`). Quick Reference shows one row per source/device per feature. Executive Summary and dashboard Feature Details tables include a Device column showing the config filename.
+Parser summaries use `"Source: Entry1, Entry2"` format (set in `_make_result()` in `base.py`). Quick Reference shows one row per source/device per feature.
+
+### Summary Features in Dashboard
+Features in `_SUMMARY_FEATURES` set (e.g., `Topology Configured`) show their summary text (e.g., "Full Mesh") instead of a checkmark in the dashboard comparison table.
 
 ### Adding a New Parser
 1. Create `parsers/new_feature.py`
@@ -96,6 +108,8 @@ Parsers iterate containers and search relative XPaths. Some parsers (VPN topolog
 - Per-category breakdown (SD-WAN Core, Traffic Optimization, VPN & Topology, Routing, Security & NAT, Monitoring & Reporting, Network Infrastructure)
 - Panorama-managed features tracked separately — count toward score, shown in amber
 - Three status indicators in dashboard: green checkmark (enabled), amber diamond (Panorama-Managed), red X (missing)
+- Summary features (e.g., Topology Configured) show text instead of checkmark (e.g., "Full Mesh")
+- Device name with serial shown in scorecards and Excel
 - Software version info (PAN-OS version, SD-WAN plugin version) shown in scorecards and Excel
 
 ### Panorama-Managed NGFW Handling

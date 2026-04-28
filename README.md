@@ -92,15 +92,15 @@ Use "Select All" to enable all categories, or pick individual ones.
 The inline dashboard displays immediately after parsing. The Excel report is available via download button.
 
 ### Inline Dashboard
-- **Deployment Scorecards**: Per-config cards with maturity level (Basic/Advanced/Full), circular progress, PAN-OS and SD-WAN plugin versions
-- **Feature Comparison Table**: All 38 features grouped by 7 categories — green checkmark (enabled), amber diamond (Panorama-Managed), red X (missing)
+- **Deployment Scorecards**: Per-config cards with maturity level (Basic/Advanced/Full), circular progress, device name, PAN-OS and SD-WAN plugin versions
+- **Feature Comparison Table**: All 38 features grouped by 7 categories — green checkmark (enabled), amber diamond (Panorama-Managed), red X (missing). Topology Configured shows actual type (Full Mesh / Hub-Spoke)
 - **Category Bar Charts**: Horizontal bars showing coverage percentage per category per config
 - **Gap Analysis**: Missing features with actionable recommendations for each config
 
 ### Excel Report
 
 #### Single Config
-- **Executive Summary**: Deployment maturity score, category breakdown with coverage %, feature status with enabled counts, recommendations
+- **Executive Summary**: KPI scorecard (maturity level, score, enabled/gaps), device name with serial, category coverage with progress bars, compact feature status by category, prioritized recommendations with business impact
 - **Quick Reference**: All 38 features grouped by 7 categories with one row per device/source per feature
 - **Detail Sheets**: One sheet per feature with full configuration data
 - **All Features**: Split into Enabled and Disabled sections with counts
