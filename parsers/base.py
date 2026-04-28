@@ -82,10 +82,16 @@ class BaseParser(ABC):
                 rows.append(row_builder(entry))
             except Exception:
                 rows.append([self._get_name(entry), 'Parse error'])
+        if rows:
+            # Extract entry names from first column of each row
+            entry_names = [str(r[0]) for r in rows if r and r[0]]
+            summary = f"{source}: {', '.join(entry_names)}" if entry_names else f"{source}: {len(rows)} configured"
+        else:
+            summary = "Not configured"
         return FeatureResult(
             feature_name=self.FEATURE_NAME,
             enabled=len(rows) > 0,
-            summary=f"{len(rows)} configured" if rows else "Not configured",
+            summary=summary,
             columns=columns,
             rows=rows,
             source=source,

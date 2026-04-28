@@ -102,6 +102,21 @@ def _add_executive_summary(wb, scored_list, is_first_sheet=True):
                 ws.cell(row=row, column=2).border = styles.thin_border
                 row += 1
 
+        # Devices/Sources info — extract unique sources from results
+        results = s.get('results', [])
+        if results:
+            sources = []
+            for r in results:
+                if r.source and r.source not in sources and r.enabled:
+                    sources.append(r.source)
+            if sources:
+                ws.cell(row=row, column=1, value='Devices / Sources')
+                ws.cell(row=row, column=1).font = Font(name='Calibri', size=11, bold=True)
+                ws.cell(row=row, column=2, value=', '.join(sources))
+                ws.cell(row=row, column=2).font = Font(name='Calibri', size=11, color='1a2a44')
+                ws.cell(row=row, column=2).border = styles.thin_border
+                row += 1
+
         # Score and level
         level_colors = {'Full': '1E8449', 'Advanced': 'B9770E', 'Basic': '2E86C1'}
         level_color = level_colors.get(sc['level'], '2E86C1')
@@ -204,7 +219,7 @@ def generate(results: list, config_type: str = 'unknown', versions: dict = None,
     # ── Executive Summary Sheet ──
     from .scorer import score_config
     scoring = score_config(results)
-    _add_executive_summary(wb, [{'filename': 'Config', 'config_type': config_type, 'scoring': scoring, 'versions': versions}])
+    _add_executive_summary(wb, [{'filename': 'Config', 'config_type': config_type, 'scoring': scoring, 'versions': versions, 'results': results}])
 
     # ── Quick Reference Sheet ──
     ws = wb.create_sheet(title='Quick Reference')
@@ -301,13 +316,21 @@ def generate(results: list, config_type: str = 'unknown', versions: dict = None,
             ws.cell(row=row, column=4, value=r.summary)
             styles.style_data_cell(ws.cell(row=row, column=4), row)
 
-            # Count — extract number from summary
-            count = ''
-            for word in r.summary.split():
-                if word.isdigit():
-                    count = int(word)
-                    break
-            ws.cell(row=row, column=5, value=count)
+            # Count — count entries from summary (Source: Entry1, Entry2; Source2: Entry3)
+            count = 0
+            if r.enabled and r.summary:
+                for segment in r.summary.split(';'):
+                    segment = segment.strip()
+                    if ':' in segment:
+                        entries_part = segment.split(':', 1)[1].strip()
+                        count += len([e.strip() for e in entries_part.split(',') if e.strip()])
+                    else:
+                        # Fallback: try to extract number
+                        for word in segment.split():
+                            if word.isdigit():
+                                count += int(word)
+                                break
+            ws.cell(row=row, column=5, value=count if count else '')
             count_cell = ws.cell(row=row, column=5)
             count_cell.alignment = Alignment(horizontal='center')
             count_cell.border = styles.thin_border
