@@ -64,4 +64,26 @@ class TrafficDistributionParser(BaseParser):
                 ]
 
             results.append(self._make_result(c.name, entries, columns, build_row))
+
+            # Sub-feature: Link Remediation (FEC)
+            has_fec = any(
+                entry.find('error-correction') is not None for entry in entries
+            )
+            results.append(FeatureResult(
+                feature_name='Link Remediation (FEC)',
+                enabled=has_fec,
+                summary='Configured' if has_fec else 'Not configured',
+                source=c.name,
+            ))
+
+            # Sub-feature: Packet Duplication
+            has_pkt_dup = any(
+                entry.find('packet-duplication') is not None for entry in entries
+            )
+            results.append(FeatureResult(
+                feature_name='Packet Duplication',
+                enabled=has_pkt_dup,
+                summary='Configured' if has_pkt_dup else 'Not configured',
+                source=c.name,
+            ))
         return results

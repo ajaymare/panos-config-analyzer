@@ -10,7 +10,7 @@ NGFW_XPATH = './/vsys/entry/profiles/sdwan-path-quality/entry'
 
 
 class PathQualityProfilesParser(BaseParser):
-    FEATURE_NAME = 'Path Quality Profiles'
+    FEATURE_NAME = 'Path Quality Metrics'
     SHEET_NAME = 'Path Quality'
 
     def extract(self, xml_root, containers):

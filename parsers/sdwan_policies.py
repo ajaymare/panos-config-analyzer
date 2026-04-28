@@ -8,7 +8,7 @@ SHARED_PRE_XPATH = 'pre-rulebase/sdwan/rules/entry'
 
 
 class SDWANPoliciesParser(BaseParser):
-    FEATURE_NAME = 'SD-WAN Policy Rules'
+    FEATURE_NAME = 'App-ID Steering'
     SHEET_NAME = 'SD-WAN Rules'
 
     def extract(self, xml_root, containers):

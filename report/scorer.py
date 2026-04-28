@@ -8,29 +8,37 @@ for feats in FEATURE_CATEGORIES.values():
 
 TOTAL_FEATURES = len(ALL_FEATURES)
 
-# Maturity levels
+# Maturity levels (adjusted for 23 features)
 LEVELS = [
-    (10, 'Full', '#1E8449'),
-    (5, 'Advanced', '#B9770E'),
+    (16, 'Full', '#1E8449'),
+    (8, 'Advanced', '#B9770E'),
     (0, 'Basic', '#2E86C1'),
 ]
 
 # Recommendations per missing feature
 RECOMMENDATIONS = {
-    'SD-WAN Interface Profiles': 'Define interface profiles to classify WAN links by type and tag',
-    'Path Quality Profiles': 'Add SLA thresholds (latency, jitter, packet loss) for path selection',
-    'Traffic Distribution Profiles': 'Configure traffic distribution algorithms for link utilization',
-    'SD-WAN Policy Rules': 'Create App-ID based SD-WAN policies for intelligent path selection',
-    'VPN/IPSec Tunnels': 'Set up IPSec tunnels for secure branch-to-hub connectivity',
-    'VPN Clusters - Topology': 'Define VPN clusters with hub/branch topology for SD-WAN overlay',
-    'Routing (BGP/OSPF/ECMP)': 'Enable dynamic routing (BGP/OSPF) and ECMP for path redundancy',
-    'Policy-Based Forwarding': 'Add PBF rules for granular traffic steering beyond SD-WAN policies',
-    'SaaS Quality Monitoring': 'Enable SaaS monitoring for adaptive path selection to cloud apps',
-    'Digital Experience Monitoring': 'Deploy DEM probes for end-to-end application performance visibility',
-    'Zones and Interfaces': 'Configure zones and interfaces for proper network segmentation',
-    'QoS Profiles': 'Apply QoS profiles to prioritize critical application traffic',
-    'Link Management': 'Enable SD-WAN link settings on interfaces with gateway monitoring',
-    'Certificate Profiles': 'Configure certificate profiles for secure device authentication',
+    'App-ID Steering': 'Create App-ID based SD-WAN policies for intelligent path selection',
+    'Path Quality Metrics': 'Add SLA thresholds (latency, jitter, packet loss) for path selection',
+    'Bandwidth Monitoring': 'Define interface profiles with bandwidth limits for WAN link monitoring',
+    'Probe Idle Time': 'Configure probe idle time on SD-WAN interface profiles',
+    'Failback Hold Time': 'Set failback hold time on SD-WAN interface profiles for link stability',
+    'Link Remediation (FEC)': 'Enable Forward Error Correction in traffic distribution profiles',
+    'Packet Duplication': 'Enable packet duplication in traffic distribution profiles for reliability',
+    'VPN Automation': 'Define VPN clusters with hub/branch topology for SD-WAN overlay',
+    'Topologies Supported': 'Configure VPN cluster topologies (full-mesh, hub-spoke)',
+    'Hub Capacity': 'Add hub and branch devices to VPN clusters',
+    'Prisma Access Hub': 'Configure Panorama connectivity for Prisma Access integration',
+    'Sub-Second Failover': 'Enable DIA VPN failover on hub devices for sub-second failover',
+    'Tunnel Monitor': 'Enable tunnel monitoring on IPSec tunnels with destination IP probes',
+    'Dynamic Routing': 'Enable dynamic routing (BGP/OSPF) and ECMP for path redundancy',
+    'BGP AS Control': 'Configure BGP AS numbers on SD-WAN devices',
+    'BGP Private AS': 'Enable remove-private-AS for BGP route filtering',
+    'BGP Timer Profile': 'Configure BGP graceful restart timers for faster convergence',
+    'BGP Security Rule': 'Add BGP security policies per device-group',
+    'IPv6 Support': 'Enable OSPFv3 for IPv6 routing support',
+    'Multi-VR Support': 'Enable multi-VR support on SD-WAN devices',
+    'ADEM Integration': 'Deploy Autonomous DEM for end-to-end application performance visibility',
+    'Sub/Agg Interfaces': 'Configure zones, sub-interfaces, and aggregate interfaces',
     'ZTP Support': 'Enable Zero Touch Provisioning for automated device onboarding',
 }
 

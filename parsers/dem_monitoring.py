@@ -8,7 +8,7 @@ ADEM_XPATH = './/plugins/sd_wan/autonomous-dem'
 
 
 class DEMMonitoringParser(BaseParser):
-    FEATURE_NAME = 'Digital Experience Monitoring'
+    FEATURE_NAME = 'ADEM Integration'
     SHEET_NAME = 'DEM'
 
     def extract(self, xml_root, containers):

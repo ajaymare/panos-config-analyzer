@@ -107,61 +107,40 @@ def _comparison_table_html(scored_configs):
 
 
 def _feature_details_html(configs_data):
-    """Render detailed feature breakdown showing what's configured per device/source."""
-    sections = ''
-    num_configs = len(configs_data)
-
-    # Build all rows across all configs
+    """Render feature breakdown showing enabled/disabled per config."""
     rows = ''
     for cat_name, features in FEATURE_CATEGORIES.items():
         color = _cat_color_css(CAT_COLORS.get(cat_name, '2E86C1'))
-        rows += f'<tr class="cat-row" style="background:{color}"><td colspan="5">{_esc(cat_name)}</td></tr>\n'
+        rows += f'<tr class="cat-row" style="background:{color}"><td colspan="4">{_esc(cat_name)}</td></tr>\n'
 
         for feat in features:
             for cfg in configs_data:
                 cfg_name = cfg.get('filename', 'Config')
-                feat_groups = {}
-                for r in cfg['results']:
-                    if r.feature_name not in feat_groups:
-                        feat_groups[r.feature_name] = []
-                    feat_groups[r.feature_name].append(r)
+                rlist = [r for r in cfg['results'] if r.feature_name == feat]
+                enabled_count = sum(1 for r in rlist if r.enabled)
 
-                rlist = feat_groups.get(feat, [])
-                enabled_results = [r for r in rlist if r.enabled]
-
-                if not enabled_results:
-                    rows += f'''<tr>
-                      <td class="detail-device">{_esc(cfg_name)}</td>
-                      <td class="feat-name">{_esc(feat)}</td>
-                      <td class="status-cell disabled">&#10007;</td>
-                      <td>—</td>
-                      <td>Not configured</td>
-                    </tr>\n'''
-                    continue
-
-                for r in enabled_results:
-                    items = r.summary
-                    if ':' in items:
-                        items = items.split(':', 1)[1].strip()
-                    count = len([e.strip() for e in items.split(',') if e.strip()]) if items else 0
-
+                if enabled_count:
                     rows += f'''<tr>
                       <td class="detail-device">{_esc(cfg_name)}</td>
                       <td class="feat-name">{_esc(feat)}</td>
                       <td class="status-cell enabled">&#10003;</td>
-                      <td class="detail-source">{_esc(r.source)}</td>
-                      <td class="detail-items">{_esc(items)} <span class="detail-count">({count})</span></td>
+                      <td class="detail-count">{enabled_count}</td>
+                    </tr>\n'''
+                else:
+                    rows += f'''<tr>
+                      <td class="detail-device">{_esc(cfg_name)}</td>
+                      <td class="feat-name">{_esc(feat)}</td>
+                      <td class="status-cell disabled">&#10007;</td>
+                      <td>0</td>
                     </tr>\n'''
 
-    sections = f'''
+    return f'''
     <div class="detail-card">
       <table class="detail-table">
-        <thead><tr><th>Device</th><th>Feature</th><th>Status</th><th>Device / Source</th><th>Configured Items</th></tr></thead>
+        <thead><tr><th>Device</th><th>Feature</th><th>Status</th><th>Enabled Count</th></tr></thead>
         <tbody>{rows}</tbody>
       </table>
     </div>'''
-
-    return sections
 
 
 def _gap_analysis_html(scored_configs):
@@ -322,8 +301,6 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
 .detail-table th { background: #1a2a44; color: #fff; padding: 8px 12px;
   font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; text-align: left; }
 .detail-table td { padding: 6px 12px; border-bottom: 1px solid #e8ecf0; font-size: 12px; }
-.detail-source { color: #0066cc; font-weight: 600; }
-.detail-items { color: #4a5568; }
 .detail-count { color: #1E8449; font-weight: 700; font-size: 11px; }
 
 /* Footer */

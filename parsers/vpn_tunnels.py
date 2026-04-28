@@ -63,4 +63,17 @@ class VPNTunnelsParser(BaseParser):
                 rows=rows,
                 source=c.name,
             ))
+
+            # Sub-feature: Tunnel Monitor
+            has_tunnel_mon = any(
+                entry.find('tunnel-monitor') is not None and
+                self._find_text(entry.find('tunnel-monitor'), 'enable', 'no') == 'yes'
+                for entry in ipsec
+            )
+            results.append(FeatureResult(
+                feature_name='Tunnel Monitor',
+                enabled=has_tunnel_mon,
+                summary='Configured' if has_tunnel_mon else 'Not configured',
+                source=c.name,
+            ))
         return results

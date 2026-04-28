@@ -11,7 +11,7 @@ PLUGIN_PANORAMA_CONN = './/plugins/sd_wan/panorama-connectivity'
 
 
 class VPNTopologyParser(BaseParser):
-    FEATURE_NAME = 'VPN Clusters - Topology'
+    FEATURE_NAME = 'VPN Automation'
     SHEET_NAME = 'VPN Topology'
 
     def extract(self, xml_root, containers):
@@ -173,5 +173,109 @@ class VPNTopologyParser(BaseParser):
                 summary='Not configured',
                 source='Panorama Plugins',
             ))
+
+        # Sub-feature: Topologies Supported
+        if clusters:
+            types = set()
+            for entry in clusters:
+                t = self._find_text(entry, 'type')
+                if t:
+                    types.add(t)
+            results.append(FeatureResult(
+                feature_name='Topologies Supported',
+                enabled=True,
+                summary=', '.join(types) if types else 'Configured',
+                source='Panorama Plugins',
+            ))
+        else:
+            results.append(FeatureResult(
+                feature_name='Topologies Supported',
+                enabled=False,
+                summary='Not configured',
+                source='Panorama Plugins',
+            ))
+
+        # Sub-feature: Hub Capacity
+        if clusters:
+            total_hubs = sum(len(self._find_all(e, 'hubs/entry')) for e in clusters)
+            total_branches = sum(len(self._find_all(e, 'branches/entry')) for e in clusters)
+            results.append(FeatureResult(
+                feature_name='Hub Capacity',
+                enabled=True,
+                summary=f'{total_hubs} hubs, {total_branches} branches',
+                source='Panorama Plugins',
+            ))
+        else:
+            results.append(FeatureResult(
+                feature_name='Hub Capacity',
+                enabled=False,
+                summary='Not configured',
+                source='Panorama Plugins',
+            ))
+
+        # Sub-feature: Prisma Access Hub
+        results.append(FeatureResult(
+            feature_name='Prisma Access Hub',
+            enabled=panorama_conn is not None,
+            summary='Configured' if panorama_conn is not None else 'Not configured',
+            source='Panorama Plugins',
+        ))
+
+        # Sub-feature: Sub-Second Failover (DIA VPN Failover)
+        has_dia_failover = False
+        for entry in clusters:
+            for h in self._find_all(entry, 'hubs/entry'):
+                if self._find_text(h, 'allow-dia-vpn-failover', 'no') == 'yes':
+                    has_dia_failover = True
+                    break
+        results.append(FeatureResult(
+            feature_name='Sub-Second Failover',
+            enabled=has_dia_failover,
+            summary='Configured' if has_dia_failover else 'Not configured',
+            source='Panorama Plugins',
+        ))
+
+        # Sub-feature: BGP AS Control
+        has_bgp_as = any(
+            self._find_text(dev, 'bgp/as-number') for dev in devices
+        )
+        results.append(FeatureResult(
+            feature_name='BGP AS Control',
+            enabled=has_bgp_as,
+            summary='Configured' if has_bgp_as else 'Not configured',
+            source='Panorama Plugins',
+        ))
+
+        # Sub-feature: BGP Private AS
+        has_private_as = any(
+            self._find_text(dev, 'bgp/remove-private-as', 'no') == 'yes'
+            for dev in devices
+        )
+        results.append(FeatureResult(
+            feature_name='BGP Private AS',
+            enabled=has_private_as,
+            summary='Configured' if has_private_as else 'Not configured',
+            source='Panorama Plugins',
+        ))
+
+        # Sub-feature: BGP Security Rule
+        results.append(FeatureResult(
+            feature_name='BGP Security Rule',
+            enabled=len(bgp_policy_groups) > 0,
+            summary=f'{len(bgp_policy_groups)} policy groups' if bgp_policy_groups else 'Not configured',
+            source='Panorama Plugins',
+        ))
+
+        # Sub-feature: Multi-VR Support
+        has_multi_vr = any(
+            self._find_text(dev, 'multi-vr-support', 'no') == 'yes'
+            for dev in devices
+        )
+        results.append(FeatureResult(
+            feature_name='Multi-VR Support',
+            enabled=has_multi_vr,
+            summary='Configured' if has_multi_vr else 'Not configured',
+            source='Panorama Plugins',
+        ))
 
         return results

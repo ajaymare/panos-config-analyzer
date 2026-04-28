@@ -7,7 +7,7 @@ VSYS_XPATH = './/vsys/entry/sdwan-interface-profile/entry'
 
 
 class SDWANInterfaceProfilesParser(BaseParser):
-    FEATURE_NAME = 'SD-WAN Interface Profiles'
+    FEATURE_NAME = 'Bandwidth Monitoring'
     SHEET_NAME = 'Interface Profiles'
 
     def extract(self, xml_root, containers):
@@ -36,4 +36,22 @@ class SDWANInterfaceProfilesParser(BaseParser):
                 ]
 
             results.append(self._make_result(c.name, entries, columns, build_row))
+
+            # Sub-feature: Probe Idle Time
+            has_probe_idle = any(self._find_text(e, 'probe-idle-time') for e in entries)
+            results.append(FeatureResult(
+                feature_name='Probe Idle Time',
+                enabled=has_probe_idle,
+                summary='Configured' if has_probe_idle else 'Not configured',
+                source=c.name,
+            ))
+
+            # Sub-feature: Failback Hold Time
+            has_failback = any(self._find_text(e, 'failback-hold-time') for e in entries)
+            results.append(FeatureResult(
+                feature_name='Failback Hold Time',
+                enabled=has_failback,
+                summary='Configured' if has_failback else 'Not configured',
+                source=c.name,
+            ))
         return results

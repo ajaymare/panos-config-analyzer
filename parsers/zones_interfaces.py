@@ -17,7 +17,7 @@ ZONE_XPATH = './/vsys/entry/zone/entry'
 
 
 class ZonesInterfacesParser(BaseParser):
-    FEATURE_NAME = 'Zones and Interfaces'
+    FEATURE_NAME = 'Sub/Agg Interfaces'
     SHEET_NAME = 'Zones Interfaces'
 
     def _parse_interface(self, entry, intf_type_label, parent_name=''):

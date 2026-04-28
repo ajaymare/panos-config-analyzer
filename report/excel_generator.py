@@ -14,30 +14,36 @@ REPORT_DIR = app_config.REPORT_DIR
 # Category grouping for quick reference
 FEATURE_CATEGORIES = {
     'SD-WAN Core': [
-        'SD-WAN Interface Profiles', 'Path Quality Profiles',
-        'Traffic Distribution Profiles', 'SD-WAN Policy Rules',
+        'App-ID Steering', 'Path Quality Metrics',
+        'Bandwidth Monitoring', 'Probe Idle Time', 'Failback Hold Time',
+    ],
+    'Traffic Optimization': [
+        'Link Remediation (FEC)', 'Packet Duplication',
     ],
     'VPN & Topology': [
-        'VPN/IPSec Tunnels', 'VPN Clusters - Topology',
+        'VPN Automation', 'Topologies Supported',
+        'Hub Capacity', 'Prisma Access Hub',
+        'Sub-Second Failover', 'Tunnel Monitor',
     ],
-    'Routing & Forwarding': [
-        'Routing (BGP/OSPF/ECMP)', 'Policy-Based Forwarding',
+    'Routing': [
+        'Dynamic Routing', 'BGP AS Control', 'BGP Private AS',
+        'BGP Timer Profile', 'BGP Security Rule',
+        'IPv6 Support', 'Multi-VR Support',
     ],
     'Monitoring': [
-        'SaaS Quality Monitoring', 'Digital Experience Monitoring',
+        'ADEM Integration',
     ],
     'Network Infrastructure': [
-        'Zones and Interfaces', 'QoS Profiles',
-        'Link Management', 'Certificate Profiles',
-        'ZTP Support',
+        'Sub/Agg Interfaces', 'ZTP Support',
     ],
 }
 
 # Category colors
 CAT_COLORS = {
     'SD-WAN Core': '1B4F72',
+    'Traffic Optimization': '884EA0',
     'VPN & Topology': '6C3483',
-    'Routing & Forwarding': '1E8449',
+    'Routing': '1E8449',
     'Monitoring': 'B9770E',
     'Network Infrastructure': '2E86C1',
 }
@@ -180,7 +186,7 @@ def _add_executive_summary(wb, scored_list, is_first_sheet=True):
                     feat_groups[r.feature_name] = []
                 feat_groups[r.feature_name].append(r)
 
-            detail_headers = ['Device', 'Feature', 'Status', 'Device / Source', 'Configured Items']
+            detail_headers = ['Device', 'Feature', 'Status', 'Enabled Count']
             for col, h in enumerate(detail_headers, 1):
                 ws.cell(row=row, column=col, value=h)
             styles.style_header_row(ws, row, len(detail_headers))
@@ -200,41 +206,22 @@ def _add_executive_summary(wb, scored_list, is_first_sheet=True):
 
                 for feat_name in features:
                     rlist = feat_groups.get(feat_name, [])
-                    enabled_results = [r for r in rlist if r.enabled]
+                    enabled_count = sum(1 for r in rlist if r.enabled)
 
-                    if not enabled_results:
-                        ws.cell(row=row, column=1, value=name)
-                        styles.style_data_cell(ws.cell(row=row, column=1), row)
-                        ws.cell(row=row, column=2, value=feat_name)
-                        styles.style_data_cell(ws.cell(row=row, column=2), row)
-                        styles.style_status_cell(ws.cell(row=row, column=3), False)
-                        ws.cell(row=row, column=4, value='—')
-                        styles.style_data_cell(ws.cell(row=row, column=4), row)
-                        ws.cell(row=row, column=5, value='Not configured')
-                        ws.cell(row=row, column=5).font = Font(name='Calibri', size=11, color='C0392B')
-                        ws.cell(row=row, column=5).border = styles.thin_border
-                        row += 1
-                        continue
+                    ws.cell(row=row, column=1, value=name)
+                    styles.style_data_cell(ws.cell(row=row, column=1), row)
+                    ws.cell(row=row, column=2, value=feat_name)
+                    styles.style_data_cell(ws.cell(row=row, column=2), row)
+                    styles.style_status_cell(ws.cell(row=row, column=3), enabled_count > 0)
 
-                    for r in enabled_results:
-                        ws.cell(row=row, column=1, value=name)
-                        styles.style_data_cell(ws.cell(row=row, column=1), row)
-                        ws.cell(row=row, column=2, value=feat_name)
-                        styles.style_data_cell(ws.cell(row=row, column=2), row)
-                        styles.style_status_cell(ws.cell(row=row, column=3), True)
-
-                        ws.cell(row=row, column=4, value=r.source)
-                        ws.cell(row=row, column=4).font = Font(name='Calibri', size=11, bold=True, color='0066CC')
-                        ws.cell(row=row, column=4).border = styles.thin_border
-
-                        # Extract items from summary
-                        items = r.summary
-                        if ':' in items:
-                            items = items.split(':', 1)[1].strip()
-                        ws.cell(row=row, column=5, value=items)
-                        ws.cell(row=row, column=5).font = Font(name='Calibri', size=11)
-                        ws.cell(row=row, column=5).border = styles.thin_border
-                        row += 1
+                    ws.cell(row=row, column=4, value=enabled_count)
+                    ws.cell(row=row, column=4).alignment = Alignment(horizontal='center')
+                    ws.cell(row=row, column=4).border = styles.thin_border
+                    if enabled_count > 0:
+                        ws.cell(row=row, column=4).font = Font(name='Calibri', size=11, bold=True, color='1E8449')
+                    else:
+                        ws.cell(row=row, column=4).font = Font(name='Calibri', size=11, color='C0392B')
+                    row += 1
 
             row += 1
 

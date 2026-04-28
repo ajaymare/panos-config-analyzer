@@ -6,7 +6,7 @@ LR_XPATH = './/network/logical-router/entry'
 
 
 class RoutingParser(BaseParser):
-    FEATURE_NAME = 'Routing (BGP/OSPF/ECMP)'
+    FEATURE_NAME = 'Dynamic Routing'
     SHEET_NAME = 'Routing'
 
     def extract(self, xml_root, containers):
@@ -89,5 +89,49 @@ class RoutingParser(BaseParser):
                 enabled=len(rows) > 0,
                 summary=f"{len(vrs)} VRs, {len(lrs)} LRs" if rows else "Not configured",
                 columns=columns, rows=rows, source=c.name,
+            ))
+
+            # Sub-feature: BGP Timer Profile (graceful restart)
+            has_gr = False
+            for vr in vrs:
+                bgp = vr.find('protocol/bgp')
+                if bgp is not None:
+                    gr = bgp.find('graceful-restart')
+                    if gr is not None and self._find_text(gr, 'enable', 'no') == 'yes':
+                        has_gr = True
+                        break
+            for lr in lrs:
+                for vrf in self._find_all(lr, 'vrf/entry'):
+                    bgp = vrf.find('bgp')
+                    if bgp is not None:
+                        gr = bgp.find('graceful-restart')
+                        if gr is not None and self._find_text(gr, 'enable', 'no') == 'yes':
+                            has_gr = True
+                            break
+            results.append(FeatureResult(
+                feature_name='BGP Timer Profile',
+                enabled=has_gr,
+                summary='Configured' if has_gr else 'Not configured',
+                source=c.name,
+            ))
+
+            # Sub-feature: IPv6 Support (OSPFv3)
+            has_ipv6 = False
+            for vr in vrs:
+                ospfv3 = vr.find('protocol/ospfv3')
+                if ospfv3 is not None and self._find_text(ospfv3, 'enable', 'no') == 'yes':
+                    has_ipv6 = True
+                    break
+            for lr in lrs:
+                for vrf in self._find_all(lr, 'vrf/entry'):
+                    ospfv3 = vrf.find('ospfv3')
+                    if ospfv3 is not None and self._find_text(ospfv3, 'enable', 'no') == 'yes':
+                        has_ipv6 = True
+                        break
+            results.append(FeatureResult(
+                feature_name='IPv6 Support',
+                enabled=has_ipv6,
+                summary='Configured' if has_ipv6 else 'Not configured',
+                source=c.name,
             ))
         return results
