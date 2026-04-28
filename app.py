@@ -20,7 +20,7 @@ _PANORAMA_SDWAN_FEATURES = {
     'SD-WAN Interface Profiles', 'App-ID Steering', 'Path Quality Metrics',
     'Bandwidth Monitoring', 'Probe Idle Time', 'Failback Hold Time',
     'Link Remediation (FEC)', 'Packet Duplication',
-    'VPN Automation', 'Topologies Supported',
+    'VPN Automation', 'Topology Configured',
     'Hub Capacity', 'Prisma Access Hub',
     'Sub-Second Failover',
     'ADEM Integration', 'SD-WAN Reporting',

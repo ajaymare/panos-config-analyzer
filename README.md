@@ -24,7 +24,7 @@ Docker-based tool with a Flask web UI that parses Palo Alto Panorama/NGFW config
 |----------|----------|
 | **SD-WAN Core** | SD-WAN Interface Profiles, App-ID Steering, Path Quality Metrics, Bandwidth Monitoring, Probe Idle Time, Failback Hold Time |
 | **Traffic Optimization** | Link Remediation (FEC), Packet Duplication |
-| **VPN & Topology** | VPN Automation, Topologies Supported, Hub Capacity, Prisma Access Hub, Sub-Second Failover, Tunnel Monitor |
+| **VPN & Topology** | VPN Automation, Topology Configured, Hub Capacity, Prisma Access Hub, Sub-Second Failover, Tunnel Monitor |
 | **Routing** | Dynamic Routing, BGP AS Control, BGP Private AS, BGP Timer Profile, BGP Security Rule, BGP Routing Profiles, BGP Dampening, IPv6 Support, Multi-VR Support, Multicast Support, BFD Configuration, Advance Routing |
 | **Security & NAT** | SD-WAN Security Rules, SD-WAN NAT Policies |
 | **Monitoring & Reporting** | ADEM Integration, SD-WAN Reporting, Log Collection, Device Telemetry, Monitor Profiles |

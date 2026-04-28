@@ -21,7 +21,7 @@ FEATURE_CATEGORIES = {
         'Link Remediation (FEC)', 'Packet Duplication',
     ],
     'VPN & Topology': [
-        'VPN Automation', 'Topologies Supported',
+        'VPN Automation', 'Topology Configured',
         'Hub Capacity', 'Prisma Access Hub',
         'Sub-Second Failover', 'Tunnel Monitor',
     ],

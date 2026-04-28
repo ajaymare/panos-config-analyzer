@@ -174,22 +174,33 @@ class VPNTopologyParser(BaseParser):
                 source='Panorama Plugins',
             ))
 
-        # Sub-feature: Topologies Supported
+        # Sub-feature: Topology Configured
         if clusters:
-            types = set()
+            raw_types = set()
             for entry in clusters:
                 t = self._find_text(entry, 'type')
                 if t:
-                    types.add(t)
+                    raw_types.add(t.strip().lower())
+            # Map raw values to display names
+            display_names = []
+            if 'mesh' in raw_types or 'full-mesh' in raw_types:
+                display_names.append('Full Mesh')
+            if 'hub-spoke' in raw_types or 'hub_spoke' in raw_types:
+                display_names.append('Hub-Spoke')
+            # Catch any other types
+            known = {'mesh', 'full-mesh', 'hub-spoke', 'hub_spoke'}
+            for t in raw_types - known:
+                display_names.append(t.title())
+            summary = ', '.join(display_names) if display_names else 'Configured'
             results.append(FeatureResult(
-                feature_name='Topologies Supported',
+                feature_name='Topology Configured',
                 enabled=True,
-                summary=', '.join(types) if types else 'Configured',
+                summary=summary,
                 source='Panorama Plugins',
             ))
         else:
             results.append(FeatureResult(
-                feature_name='Topologies Supported',
+                feature_name='Topology Configured',
                 enabled=False,
                 summary='Not configured',
                 source='Panorama Plugins',

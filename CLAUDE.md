@@ -52,7 +52,7 @@ Features are defined in `FEATURE_CATEGORIES` in `report/excel_generator.py`. Cat
 
 ### Enhanced Parser Sub-Features
 Many parsers emit multiple `FeatureResult` objects — a primary feature plus sub-features for scoring:
-- **VPN Topology** (`VPN Automation`): + Topologies Supported, Hub Capacity, Prisma Access Hub, Sub-Second Failover, BGP AS Control, BGP Private AS, BGP Security Rule, Multi-VR Support
+- **VPN Topology** (`VPN Automation`): + Topology Configured, Hub Capacity, Prisma Access Hub, Sub-Second Failover, BGP AS Control, BGP Private AS, BGP Security Rule, Multi-VR Support
 - **Routing** (`Dynamic Routing`): + BGP Timer Profile, IPv6 Support, Multicast Support, BFD Configuration, BGP Dampening, BGP Routing Profiles
 - **SD-WAN Interface Profiles**: + Bandwidth Monitoring, Probe Idle Time, Failback Hold Time
 - **Traffic Distribution**: + Link Remediation (FEC), Packet Duplication
