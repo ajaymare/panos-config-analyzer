@@ -23,10 +23,13 @@ _PANORAMA_SDWAN_FEATURES = {
     'VPN Automation', 'Topologies Supported',
     'Hub Capacity', 'Prisma Access Hub',
     'Sub-Second Failover',
-    'ADEM Integration',
+    'ADEM Integration', 'SD-WAN Reporting',
     'ZTP Support',
     'BGP AS Control', 'BGP Private AS', 'BGP Security Rule',
     'Multi-VR Support',
+    'SD-WAN Security Rules', 'SD-WAN NAT Policies',
+    'Custom Applications', 'Template/Stack Mapping',
+    'Log Collection',
 }
 
 

@@ -3,6 +3,7 @@ from .base import BaseParser, FeatureResult
 
 VR_XPATH = './/network/virtual-router/entry'
 LR_XPATH = './/network/logical-router/entry'
+ROUTING_PROFILE_XPATH = './/network/routing-profile/bgp'
 
 
 class RoutingParser(BaseParser):
@@ -134,4 +135,73 @@ class RoutingParser(BaseParser):
                 summary='Configured' if has_ipv6 else 'Not configured',
                 source=c.name,
             ))
+
+            # Sub-feature: Multicast (PIM/IGMP)
+            has_multicast = False
+            for lr in lrs:
+                for vrf in self._find_all(lr, 'vrf/entry'):
+                    mcast = vrf.find('multicast')
+                    if mcast is not None:
+                        pim = mcast.find('pim')
+                        igmp = mcast.find('igmp')
+                        if (pim is not None and self._find_text(pim, 'enable', 'no') == 'yes') or \
+                           (igmp is not None and self._find_text(igmp, 'enable', 'no') == 'yes'):
+                            has_multicast = True
+                            break
+            results.append(FeatureResult(
+                feature_name='Multicast Support',
+                enabled=has_multicast,
+                summary='Configured' if has_multicast else 'Not configured',
+                source=c.name,
+            ))
+
+            # Sub-feature: BFD Configuration
+            has_bfd = False
+            all_routers = list(vrs) + [vrf for lr in lrs for vrf in self._find_all(lr, 'vrf/entry')]
+            for router in all_routers:
+                bgp_node = router.find('protocol/bgp') if router.find('protocol/bgp') is not None else router.find('bgp')
+                if bgp_node is not None:
+                    bfd = bgp_node.find('global-bfd/profile')
+                    if bfd is not None and bfd.text and bfd.text != 'None':
+                        has_bfd = True
+                        break
+            results.append(FeatureResult(
+                feature_name='BFD Configuration',
+                enabled=has_bfd,
+                summary='Configured' if has_bfd else 'Not configured',
+                source=c.name,
+            ))
+
+            # Sub-feature: BGP Dampening
+            has_dampening = False
+            for vr in vrs:
+                bgp = vr.find('protocol/bgp')
+                if bgp is not None:
+                    damp = self._find_all(bgp, 'dampening-profile/entry')
+                    if damp:
+                        has_dampening = True
+                        break
+            results.append(FeatureResult(
+                feature_name='BGP Dampening',
+                enabled=has_dampening,
+                summary='Configured' if has_dampening else 'Not configured',
+                source=c.name,
+            ))
+
+            # Sub-feature: BGP Routing Profiles
+            routing_profiles = self._find_all(c.xml_node, ROUTING_PROFILE_XPATH)
+            has_routing_profiles = False
+            for rp in routing_profiles:
+                af_profiles = self._find_all(rp, 'address-family-profile/entry')
+                filter_profiles = self._find_all(rp, 'filtering-profile/entry')
+                if af_profiles or filter_profiles:
+                    has_routing_profiles = True
+                    break
+            results.append(FeatureResult(
+                feature_name='BGP Routing Profiles',
+                enabled=has_routing_profiles,
+                summary='Configured' if has_routing_profiles else 'Not configured',
+                source=c.name,
+            ))
+
         return results

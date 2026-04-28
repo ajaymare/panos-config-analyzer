@@ -28,13 +28,23 @@ FEATURE_CATEGORIES = {
     'Routing': [
         'Dynamic Routing', 'BGP AS Control', 'BGP Private AS',
         'BGP Timer Profile', 'BGP Security Rule',
+        'BGP Routing Profiles', 'BGP Dampening',
         'IPv6 Support', 'Multi-VR Support',
+        'Multicast Support', 'BFD Configuration',
+        'Advance Routing',
     ],
-    'Monitoring': [
-        'ADEM Integration',
+    'Security & NAT': [
+        'SD-WAN Security Rules', 'SD-WAN NAT Policies',
+    ],
+    'Monitoring & Reporting': [
+        'ADEM Integration', 'SD-WAN Reporting',
+        'Log Collection', 'Device Telemetry',
+        'Monitor Profiles',
     ],
     'Network Infrastructure': [
-        'Sub/Agg Interfaces', 'ZTP Support',
+        'Sub/Agg Interfaces', 'Custom Applications',
+        'Template/Stack Mapping', 'Upstream NAT',
+        'ZTP Support',
     ],
 }
 
@@ -44,7 +54,8 @@ CAT_COLORS = {
     'Traffic Optimization': '884EA0',
     'VPN & Topology': '6C3483',
     'Routing': '1E8449',
-    'Monitoring': 'B9770E',
+    'Security & NAT': 'C0392B',
+    'Monitoring & Reporting': 'B9770E',
     'Network Infrastructure': '2E86C1',
 }
 

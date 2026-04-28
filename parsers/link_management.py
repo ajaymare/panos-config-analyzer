@@ -60,4 +60,13 @@ class LinkManagementParser(BaseParser):
                 rows=rows,
                 source=c.name,
             ))
+
+            # Sub-feature: Upstream NAT
+            has_upstream_nat = any(r[3] == 'yes' for r in rows)
+            results.append(FeatureResult(
+                feature_name='Upstream NAT',
+                enabled=has_upstream_nat,
+                summary='Configured' if has_upstream_nat else 'Not configured',
+                source=c.name,
+            ))
         return results

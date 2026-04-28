@@ -8,10 +8,10 @@ for feats in FEATURE_CATEGORIES.values():
 
 TOTAL_FEATURES = len(ALL_FEATURES)
 
-# Maturity levels (adjusted for 24 features)
+# Maturity levels (adjusted for 38 features)
 LEVELS = [
-    (17, 'Full', '#1E8449'),
-    (9, 'Advanced', '#B9770E'),
+    (27, 'Full', '#1E8449'),
+    (14, 'Advanced', '#B9770E'),
     (0, 'Basic', '#2E86C1'),
 ]
 
@@ -36,10 +36,24 @@ RECOMMENDATIONS = {
     'BGP Private AS': 'Enable remove-private-AS for BGP route filtering',
     'BGP Timer Profile': 'Configure BGP graceful restart timers for faster convergence',
     'BGP Security Rule': 'Add BGP security policies per device-group',
+    'BGP Routing Profiles': 'Configure BGP address-family and filtering profiles for hybrid WAN',
+    'BGP Dampening': 'Configure BGP dampening profiles to handle route flaps',
     'IPv6 Support': 'Enable OSPFv3 for IPv6 routing support',
     'Multi-VR Support': 'Enable multi-VR support on SD-WAN devices',
+    'Multicast Support': 'Enable PIM/IGMP for multicast routing over SD-WAN',
+    'BFD Configuration': 'Configure BFD for fast link failure detection',
+    'Advance Routing': 'Enable advanced routing engine for logical routers and VRFs',
+    'SD-WAN Security Rules': 'Configure security rules for SD-WAN zone traffic',
+    'SD-WAN NAT Policies': 'Configure NAT policies for SD-WAN tunnel traffic',
     'ADEM Integration': 'Deploy Autonomous DEM for end-to-end application performance visibility',
+    'SD-WAN Reporting': 'Configure ad-hoc reports for app and link performance monitoring',
+    'Log Collection': 'Set up log collectors and forwarding for SD-WAN visibility',
+    'Device Telemetry': 'Enable device health and usage telemetry',
+    'Monitor Profiles': 'Configure monitor profiles for tunnel and path health checks',
     'Sub/Agg Interfaces': 'Configure zones, sub-interfaces, and aggregate interfaces',
+    'Custom Applications': 'Define custom applications for App-ID based SD-WAN steering',
+    'Template/Stack Mapping': 'Organize device-to-template stack assignments',
+    'Upstream NAT': 'Configure upstream NAT for SD-WAN devices behind third-party NAT',
     'ZTP Support': 'Enable Zero Touch Provisioning for automated device onboarding',
 }
 
