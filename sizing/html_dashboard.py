@@ -305,13 +305,10 @@ def generate_sizing_dashboard(result):
     tunnel_calc = result['tunnel_calc']
     security_features = result.get('security_features', {})
 
-    html = '<div class="sizing-dashboard">'
+    hub_virtual = result.get('hub_virtual')
+    vm_series = result.get('vm_series', False)
 
-    # --- Per-role platform labels ---
-    hub_platform = result['hub'].get('platform', 'hardware')
-    branch_platform = result['branch'].get('platform', 'hardware')
-    hub_platform_label = 'VM-Series' if hub_platform == 'virtual' else 'Hardware'
-    branch_platform_label = 'VM-Series' if branch_platform == 'virtual' else 'Hardware'
+    html = '<div class="sizing-dashboard">'
 
     # --- Deployment Summary Banner ---
     ha_text = []
@@ -325,10 +322,7 @@ def generate_sizing_dashboard(result):
         ha_text.append(f'Branch: No')
     ha_display = ' | '.join(ha_text)
 
-    if hub_platform == branch_platform:
-        platform_display = hub_platform_label
-    else:
-        platform_display = f'Hub: {hub_platform_label} | Branch: {branch_platform_label}'
+    platform_display = 'Hardware + VM-Series' if vm_series else 'Hardware'
 
     # Count enabled security features
     sec_enabled = sum(1 for k in SECURITY_FEATURES if security_features.get(k))
@@ -369,6 +363,8 @@ def generate_sizing_dashboard(result):
     # --- Hub and Branch Cards ---
     html += '<div class="sizing-cards-row">'
     html += _render_model_card('Hub', hub, security_features)
+    if hub_virtual:
+        html += _render_model_card('Hub', hub_virtual, security_features)
     html += _render_model_card('Branch', branch, security_features)
     html += '</div>'
 
@@ -437,17 +433,32 @@ def generate_sizing_dashboard(result):
                 <tr>
                     <td>Hub</td>
                     <td><strong>{escape(hub["model"])}</strong></td>
-                    <td>{hub_platform_label}</td>
+                    <td>Hardware</td>
                     <td>{summary["num_hubs"]}</td>
                     <td>{hub_ha_label}</td>
                     <td>{hub["device_count"]}</td>
                     <td>{escape(hub["specs"].get("form_factor", ""))}</td>
                     <td>{escape(hub["specs"].get("series", ""))}</td>
                 </tr>
+    '''
+    if hub_virtual:
+        html += f'''
+                <tr>
+                    <td>Hub (Cloud)</td>
+                    <td><strong>{escape(hub_virtual["model"])}</strong></td>
+                    <td>VM-Series</td>
+                    <td>{summary["num_hubs"]}</td>
+                    <td>{hub_ha_label}</td>
+                    <td>{hub_virtual["device_count"]}</td>
+                    <td>{escape(hub_virtual["specs"].get("form_factor", ""))}</td>
+                    <td>{escape(hub_virtual["specs"].get("series", ""))}</td>
+                </tr>
+        '''
+    html += f'''
                 <tr>
                     <td>Branch</td>
                     <td><strong>{escape(branch["model"])}</strong></td>
-                    <td>{branch_platform_label}</td>
+                    <td>Hardware</td>
                     <td>{summary["num_branches"]}</td>
                     <td>{branch_ha_label}</td>
                     <td>{branch["device_count"]}</td>

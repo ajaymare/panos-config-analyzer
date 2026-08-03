@@ -212,11 +212,10 @@ def calculate_sizing(inputs):
             dns_security: bool
             hub_ha: bool
             branch_ha_count: int
-            hub_platform: str ('hardware' or 'virtual')
-            branch_platform: str ('hardware' or 'virtual')
+            vm_series: bool (include VM-Series hub recommendation)
 
     Returns:
-        dict with hub_recommendation, branch_recommendation, tunnel_calc,
+        dict with hub, branch, (optional hub_virtual), tunnel_calc,
         licensing, summary.
     """
     num_hubs = inputs.get('num_hubs', 1)
@@ -231,8 +230,7 @@ def calculate_sizing(inputs):
     branch_sessions = inputs.get('branch_sessions', 50000)
     hub_ha = inputs.get('hub_ha', False)
     branch_ha_count = inputs.get('branch_ha_count', 0)
-    hub_platform = inputs.get('hub_platform', 'hardware')
-    branch_platform = inputs.get('branch_platform', 'hardware')
+    vm_series = inputs.get('vm_series', False)
 
     # Security features dict
     security_features = {
@@ -256,24 +254,53 @@ def calculate_sizing(inputs):
     hub_tunnels = tunnel_calc['tunnels_per_hub']
     branch_tunnels = tunnel_calc['tunnels_per_branch']
 
-    # --- Hub sizing ---
+    # --- Hub sizing (Hardware) ---
     hub_model, hub_specs, hub_rationale, hub_alt = _find_best_model(
         required_throughput=hub_bandwidth,
         concurrent_sessions=hub_sessions,
         num_tunnels=hub_tunnels,
         role='hub',
         security_features=security_features,
-        platform=hub_platform,
+        platform='hardware',
     )
 
-    # --- Branch sizing ---
+    # --- Hub sizing (VM-Series) — only when VM-Series enabled ---
+    hub_vm_result = None
+    if vm_series:
+        vm_model, vm_specs, vm_rationale, vm_alt = _find_best_model(
+            required_throughput=hub_bandwidth,
+            concurrent_sessions=hub_sessions,
+            num_tunnels=hub_tunnels,
+            role='hub',
+            security_features=security_features,
+            platform='virtual',
+        )
+        hub_vm_result = {
+            'model': vm_model,
+            'specs': vm_specs,
+            'rationale': vm_rationale,
+            'alternative': vm_alt,
+            'platform': 'virtual',
+            'inputs': {
+                'bandwidth_mbps': hub_bandwidth,
+                'tunnels': hub_tunnels,
+                'sessions': hub_sessions,
+            },
+            'isps': {
+                'public': hub_public_isps,
+                'private': hub_private_isps,
+                'total': hub_public_isps + hub_private_isps,
+            },
+        }
+
+    # --- Branch sizing (always Hardware) ---
     branch_model, branch_specs, branch_rationale, branch_alt = _find_best_model(
         required_throughput=branch_bandwidth,
         concurrent_sessions=branch_sessions,
         num_tunnels=branch_tunnels,
         role='branch',
         security_features=security_features,
-        platform=branch_platform,
+        platform='hardware',
     )
 
     # --- Licensing ---
@@ -341,14 +368,14 @@ def calculate_sizing(inputs):
     branch_devices = (branch_ha_count * 2) + branch_non_ha
     total_devices = hub_devices + branch_devices
 
-    return {
+    result = {
         'hub': {
             'model': hub_model,
             'specs': hub_specs,
             'rationale': hub_rationale,
             'alternative': hub_alt,
             'device_count': hub_devices,
-            'platform': hub_platform,
+            'platform': 'hardware',
             'inputs': {
                 'bandwidth_mbps': hub_bandwidth,
                 'tunnels': hub_tunnels,
@@ -366,7 +393,7 @@ def calculate_sizing(inputs):
             'rationale': branch_rationale,
             'alternative': branch_alt,
             'device_count': branch_devices,
-            'platform': branch_platform,
+            'platform': 'hardware',
             'inputs': {
                 'bandwidth_mbps': branch_bandwidth,
                 'tunnels': branch_tunnels,
@@ -381,6 +408,7 @@ def calculate_sizing(inputs):
         'tunnel_calc': tunnel_calc,
         'licensing': licenses,
         'security_features': security_features,
+        'vm_series': vm_series,
         'summary': {
             'num_hubs': num_hubs,
             'num_branches': num_branches,
@@ -394,8 +422,13 @@ def calculate_sizing(inputs):
             'total_devices': total_devices,
             'hub_devices': hub_devices,
             'branch_devices': branch_devices,
-            'hub_platform': hub_platform,
-            'branch_platform': branch_platform,
+            'vm_series': vm_series,
         },
         'inputs': inputs,
     }
+
+    if hub_vm_result:
+        hub_vm_result['device_count'] = hub_devices
+        result['hub_virtual'] = hub_vm_result
+
+    return result

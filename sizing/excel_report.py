@@ -79,8 +79,8 @@ def generate_sizing_report(result, output_dir):
     summary = result['summary']
     licenses = result['licensing']
     security_features = result.get('security_features', {})
-    hub_platform = hub.get('platform', 'hardware')
-    branch_platform = branch.get('platform', 'hardware')
+    hub_virtual = result.get('hub_virtual')
+    vm_series = result.get('vm_series', False)
 
     # ========== Sheet 1: Sizing Recommendation ==========
     ws = wb.active
@@ -102,16 +102,16 @@ def generate_sizing_report(result, output_dir):
     row += 2
 
     # KPI Row
-    hub_platform_label = 'VM-Series' if hub_platform == 'virtual' else 'Hardware'
-    branch_platform_label = 'VM-Series' if branch_platform == 'virtual' else 'Hardware'
-    style_kpi_cell(ws, row, 1, 'Hub Model', hub['model'])
+    platform_label = 'Hardware + VM-Series' if vm_series else 'Hardware'
+    hub_model_label = f'{hub["model"]}' + (f' / {hub_virtual["model"]}' if hub_virtual else '')
+    style_kpi_cell(ws, row, 1, 'Hub Model', hub_model_label)
     style_kpi_cell(ws, row, 3, 'Branch Model', branch['model'])
     style_kpi_cell(ws, row, 5, 'Total Devices', summary['total_devices'])
     row += 3
 
     style_kpi_cell(ws, row, 1, 'Hub Sites', summary['num_hubs'])
     style_kpi_cell(ws, row, 3, 'Branch Sites', summary['num_branches'])
-    style_kpi_cell(ws, row, 5, 'Hub Platform', hub_platform_label)
+    style_kpi_cell(ws, row, 5, 'Platform', platform_label)
     row += 3
 
     hub_ha_label = 'Yes' if summary.get('hub_ha') else 'No'
@@ -119,7 +119,7 @@ def generate_sizing_report(result, output_dir):
     branch_ha_label = f'{branch_ha_count} of {summary["num_branches"]}' if branch_ha_count > 0 else 'No'
     style_kpi_cell(ws, row, 1, 'Hub HA', hub_ha_label)
     style_kpi_cell(ws, row, 3, 'Branch HA', branch_ha_label)
-    style_kpi_cell(ws, row, 5, 'Branch Platform', branch_platform_label)
+    style_kpi_cell(ws, row, 5, '', '')
     row += 3
 
     # --- Security Features ---
@@ -136,11 +136,11 @@ def generate_sizing_report(result, output_dir):
     row = _write_table(ws, row, ['Feature', 'Description', 'Status', 'Performance Impact'], sec_rows)
 
     # --- Hub Recommendation ---
-    row = _write_section_header(ws, row, 'Hub Recommendation', col_count)
+    row = _write_section_header(ws, row, 'Hub Recommendation (Hardware)', col_count)
     hub_specs = [
         ['Model', hub['model']],
         ['Series', hub['specs'].get('series', '')],
-        ['Platform', hub_platform_label],
+        ['Platform', 'Hardware'],
         ['Description', hub['specs'].get('description', '')],
         ['Firewall Throughput', f'{_fmt(hub["specs"]["firewall_throughput"])} Mbps'],
         ['Threat Prevention Throughput', f'{_fmt(hub["specs"]["threat_throughput"])} Mbps'],
@@ -167,12 +167,42 @@ def generate_sizing_report(result, output_dir):
         row += 1
     row += 1
 
+    # --- Hub VM-Series Recommendation (if enabled) ---
+    if hub_virtual:
+        row = _write_section_header(ws, row, 'Hub Recommendation (VM-Series)', col_count)
+        hub_vm_specs = [
+            ['Model', hub_virtual['model']],
+            ['Series', hub_virtual['specs'].get('series', '')],
+            ['Platform', 'VM-Series'],
+            ['Description', hub_virtual['specs'].get('description', '')],
+            ['Firewall Throughput', f'{_fmt(hub_virtual["specs"]["firewall_throughput"])} Mbps'],
+            ['Threat Prevention Throughput', f'{_fmt(hub_virtual["specs"]["threat_throughput"])} Mbps'],
+            ['SSL Decryption Throughput', f'{_fmt(hub_virtual["specs"].get("ssl_decrypt_throughput", 0))} Mbps'],
+            ['IPSec VPN Throughput', f'{_fmt(hub_virtual["specs"]["ipsec_vpn_throughput"])} Mbps'],
+            ['Max Concurrent Sessions', _fmt(hub_virtual['specs']['max_sessions'])],
+            ['New Sessions/Second', _fmt(hub_virtual['specs']['new_sessions_per_sec'])],
+            ['Max IPSec Tunnels', _fmt(hub_virtual['specs']['max_ipsec_tunnels'])],
+            ['Max Security Rules', _fmt(hub_virtual['specs']['max_security_rules'])],
+            ['Form Factor', hub_virtual['specs'].get('form_factor', '')],
+            ['Device Count', hub_virtual['device_count']],
+        ]
+        row = _write_table(ws, row, ['Specification', 'Value'], hub_vm_specs)
+
+        row = _write_section_header(ws, row, 'Hub VM-Series Sizing Rationale', col_count)
+        for i, r in enumerate(hub_virtual['rationale']):
+            cell = ws.cell(row=row, column=1, value=f'{i+1}. {r}')
+            cell.font = data_font
+            cell.alignment = data_align
+            ws.merge_cells(start_row=row, start_column=1, end_row=row, end_column=col_count)
+            row += 1
+        row += 1
+
     # --- Branch Recommendation ---
     row = _write_section_header(ws, row, 'Branch Recommendation', col_count)
     branch_specs = [
         ['Model', branch['model']],
         ['Series', branch['specs'].get('series', '')],
-        ['Platform', branch_platform_label],
+        ['Platform', 'Hardware'],
         ['Description', branch['specs'].get('description', '')],
         ['Firewall Throughput', f'{_fmt(branch["specs"]["firewall_throughput"])} Mbps'],
         ['Threat Prevention Throughput', f'{_fmt(branch["specs"]["threat_throughput"])} Mbps'],
@@ -246,20 +276,20 @@ def generate_sizing_report(result, output_dir):
     bha = summary.get('branch_ha_count', 0)
     branch_ha_str = f'{bha} sites' if bha > 0 else 'No'
     bom_rows = [
-        ['Hub', hub['model'], hub_platform_label, summary['num_hubs'], hub_ha_str, hub['device_count']],
-        ['Branch', branch['model'], branch_platform_label, summary['num_branches'], branch_ha_str, branch['device_count']],
-        ['Total', '', '', '', '', summary['total_devices']],
+        ['Hub', hub['model'], 'Hardware', summary['num_hubs'], hub_ha_str, hub['device_count']],
     ]
+    if hub_virtual:
+        bom_rows.append(['Hub (Cloud)', hub_virtual['model'], 'VM-Series', summary['num_hubs'], hub_ha_str, hub_virtual['device_count']])
+    bom_rows.append(['Branch', branch['model'], 'Hardware', summary['num_branches'], branch_ha_str, branch['device_count']])
+    bom_rows.append(['Total', '', '', '', '', summary['total_devices']])
     row = _write_table(ws, row, ['Role', 'Model', 'Platform', 'Sites', 'HA', 'Devices'], bom_rows)
 
     auto_width(ws)
 
     # ========== Sheet 2+: Model Comparison ==========
-    # Determine which catalogs to show
-    catalogs = []
-    if hub_platform == 'hardware' or branch_platform == 'hardware':
-        catalogs.append(('Hardware Model Comparison', PA_MODELS))
-    if hub_platform == 'virtual' or branch_platform == 'virtual':
+    # Always show hardware; add VM-Series sheet when enabled
+    catalogs = [('Hardware Model Comparison', PA_MODELS)]
+    if vm_series:
         catalogs.append(('VM-Series Comparison', VM_MODELS))
 
     headers = [
@@ -312,7 +342,7 @@ def generate_sizing_report(result, output_dir):
         for ri, row_data in enumerate(model_rows):
             r = start + 1 + ri
             model_name = row_data[0]
-            is_hub = model_name == hub['model']
+            is_hub = model_name == hub['model'] or (hub_virtual and model_name == hub_virtual['model'])
             is_branch = model_name == branch['model']
             for ci, val in enumerate(row_data, 1):
                 cell = ws2.cell(row=r, column=ci, value=val)

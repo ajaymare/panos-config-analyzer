@@ -282,43 +282,11 @@
                         <label>VM-Series</label>
                         <label class="sizing-vm-toggle-row">
                             <div class="toggle-switch">
-                                <input type="checkbox" id="sz-vm-enable" onchange="toggleVmPlatformOptions()">
+                                <input type="checkbox" id="sz-vm-enable">
                                 <span class="toggle-slider"></span>
                             </div>
-                            <span class="sizing-vm-hint">Enable to include VM-Series firewalls</span>
+                            <span class="sizing-vm-hint">Include VM-Series recommendation for Hubs</span>
                         </label>
-                    </div>
-                </div>
-
-                <div id="sz-platform-options" class="sizing-platform-section" style="display:none;">
-                    <div class="sizing-section-subtitle" style="margin-bottom:10px;">Select platform per role (Hardware is default)</div>
-                    <div class="sizing-input-grid">
-                        <div class="form-group">
-                            <label>Hub Platform</label>
-                            <div class="sizing-platform-toggle">
-                                <label class="platform-option">
-                                    <input type="radio" name="hub_platform" value="hardware" checked>
-                                    <span class="platform-label">&#128187; Hardware</span>
-                                </label>
-                                <label class="platform-option">
-                                    <input type="radio" name="hub_platform" value="virtual">
-                                    <span class="platform-label">&#9729; VM-Series</span>
-                                </label>
-                            </div>
-                        </div>
-                        <div class="form-group">
-                            <label>Branch Platform</label>
-                            <div class="sizing-platform-toggle">
-                                <label class="platform-option">
-                                    <input type="radio" name="branch_platform" value="hardware" checked>
-                                    <span class="platform-label">&#128187; Hardware</span>
-                                </label>
-                                <label class="platform-option">
-                                    <input type="radio" name="branch_platform" value="virtual">
-                                    <span class="platform-label">&#9729; VM-Series</span>
-                                </label>
-                            </div>
-                        </div>
                     </div>
                 </div>
 
@@ -1167,17 +1135,6 @@ function getSizingValue(selectId, customId) {
     return sel.value;
 }
 
-function toggleVmPlatformOptions() {
-    var enabled = document.getElementById('sz-vm-enable').checked;
-    var section = document.getElementById('sz-platform-options');
-    section.style.display = enabled ? 'block' : 'none';
-    if (!enabled) {
-        // Reset both to hardware when VM is disabled
-        var hwRadios = document.querySelectorAll('input[name="hub_platform"][value="hardware"], input[name="branch_platform"][value="hardware"]');
-        hwRadios.forEach(function(r) { r.checked = true; });
-    }
-}
-
 function submitSizing(e) {
     e.preventDefault();
     var spinner = document.getElementById('sizing-spinner');
@@ -1204,15 +1161,7 @@ function submitSizing(e) {
     formData.append('dns_security', document.getElementById('sz-dns').checked ? 'yes' : 'no');
     formData.append('hub_ha', document.getElementById('sz-hub-ha').checked ? 'yes' : 'no');
     formData.append('branch_ha_count', document.getElementById('sz-branch-ha').value);
-    if (document.getElementById('sz-vm-enable').checked) {
-        var hubPlatformRadio = document.querySelector('input[name="hub_platform"]:checked');
-        formData.append('hub_platform', hubPlatformRadio ? hubPlatformRadio.value : 'hardware');
-        var branchPlatformRadio = document.querySelector('input[name="branch_platform"]:checked');
-        formData.append('branch_platform', branchPlatformRadio ? branchPlatformRadio.value : 'hardware');
-    } else {
-        formData.append('hub_platform', 'hardware');
-        formData.append('branch_platform', 'hardware');
-    }
+    formData.append('vm_series', document.getElementById('sz-vm-enable').checked ? 'yes' : 'no');
 
     fetch('/calculate-sizing', { method: 'POST', body: formData })
         .then(function(resp) {
