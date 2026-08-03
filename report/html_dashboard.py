@@ -39,7 +39,7 @@ def _score_card_html(cfg_name, cfg_type, scoring, versions=None, serial=None):
         if versions.get('sdwan_version'):
             version_parts.append(f'SD-WAN Plugin {_esc(versions["sdwan_version"])}')
     if version_parts:
-        version_html = f'<div class="config-version">{" | ".join(version_parts)}</div>'
+        version_html = f'<div class="config-version" style="color:#fa582d">{" | ".join(version_parts)}</div>'
     # Device name line
     device_label = f'{_esc(cfg_name)}' + (f' ({_esc(serial)})' if serial else '')
     version_html += f'<div class="config-device">Device: {device_label}</div>'
@@ -230,14 +230,14 @@ CSS = '''
 * { box-sizing: border-box; margin: 0; padding: 0; }
 body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   background: #f0f4f8; color: #1e2a3a; }
-.dash-header { background: linear-gradient(135deg, #1a2a44, #243b5c);
-  padding: 24px; border-bottom: 3px solid #0066cc; text-align: center; }
+.dash-header { background: linear-gradient(135deg, #1a1a2e, #16213e);
+  padding: 24px; border-bottom: 3px solid #fa582d; text-align: center; }
 .dash-header h1 { color: #fff; font-size: 22px; font-weight: 600; }
 .dash-header p { color: #94a3b8; font-size: 12px; margin-top: 4px; }
 .container { max-width: 1100px; margin: 0 auto; padding: 24px 16px; }
 .section { margin-bottom: 32px; }
-.section-title { font-size: 16px; font-weight: 600; color: #1a2a44;
-  border-bottom: 2px solid #0066cc; padding-bottom: 6px; margin-bottom: 16px; }
+.section-title { font-size: 16px; font-weight: 600; color: #1a1a2e;
+  border-bottom: 2px solid #fa582d; padding-bottom: 6px; margin-bottom: 16px; }
 
 /* Score Cards */
 .score-cards { display: flex; gap: 16px; flex-wrap: wrap; }
@@ -250,8 +250,8 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
 .config-name { font-size: 14px; margin: 12px 0 2px; padding: 0 12px;
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .config-type { font-size: 11px; color: #6b7a8d; margin-bottom: 4px; }
-.config-version { font-size: 10px; color: #0066cc; margin-bottom: 2px; font-weight: 600; }
-.config-device { font-size: 10px; color: #1a2a44; margin-bottom: 8px; font-weight: 500; }
+.config-version { font-size: 10px; color: #fa582d; margin-bottom: 2px; font-weight: 600; }
+.config-device { font-size: 10px; color: #1a1a2e; margin-bottom: 8px; font-weight: 500; }
 .score-circle { width: 90px; height: 90px; margin: 0 auto; position: relative; }
 .score-circle svg { width: 100%; height: 100%; transform: rotate(-90deg); }
 .score-circle .bg { fill: none; stroke: #e8ecf0; stroke-width: 3; }
@@ -270,7 +270,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
 .comparison-table { width: 100%; border-collapse: collapse; background: #fff;
   border: 1px solid #d4dbe6; border-radius: 8px; overflow: hidden;
   box-shadow: 0 2px 8px rgba(0,0,0,0.06); }
-.comparison-table th { background: #1a2a44; color: #fff; padding: 10px 12px;
+.comparison-table th { background: #1a1a2e; color: #fff; padding: 10px 12px;
   font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px; }
 .comparison-table td { padding: 8px 12px; border-bottom: 1px solid #e8ecf0;
   font-size: 13px; }
@@ -290,7 +290,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
   box-shadow: 0 2px 8px rgba(0,0,0,0.06); }
 .gap-card.common { border-left: 4px solid #1E8449; }
 .gap-card.full { border-left: 4px solid #1E8449; }
-.gap-card h4 { font-size: 13px; margin-bottom: 10px; color: #1a2a44; }
+.gap-card h4 { font-size: 13px; margin-bottom: 10px; color: #1a1a2e; }
 .gap-card ul { list-style: none; padding: 0; }
 .gap-card li { font-size: 12px; padding: 4px 0; border-bottom: 1px solid #f0f4f8;
   color: #4a5568; }
@@ -302,22 +302,22 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
 .cat-chart-card { background: #fff; border: 1px solid #d4dbe6; border-radius: 8px;
   padding: 16px; flex: 1; min-width: 280px;
   box-shadow: 0 2px 8px rgba(0,0,0,0.06); }
-.cat-chart-card h4 { font-size: 13px; margin-bottom: 12px; color: #1a2a44; }
+.cat-chart-card h4 { font-size: 13px; margin-bottom: 12px; color: #1a1a2e; }
 .cat-bar-row { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
 .cat-bar-label { font-size: 11px; width: 140px; color: #4a5568; flex-shrink: 0; }
 .cat-bar-track { flex: 1; height: 14px; background: #e8ecf0; border-radius: 7px;
   overflow: hidden; }
 .cat-bar-fill { height: 100%; border-radius: 7px; transition: width 0.6s ease; }
 .cat-bar-val { font-size: 11px; font-weight: 600; width: 30px; text-align: right;
-  color: #1a2a44; flex-shrink: 0; }
+  color: #1a1a2e; flex-shrink: 0; }
 
 /* Feature Details */
 .detail-card { background: #fff; border: 1px solid #d4dbe6; border-radius: 8px;
   overflow: hidden; margin-bottom: 16px; box-shadow: 0 2px 8px rgba(0,0,0,0.06); }
 .detail-card h4 { font-size: 14px; padding: 12px 16px; margin: 0;
-  background: #f7f9fc; border-bottom: 1px solid #e8ecf0; color: #1a2a44; }
+  background: #f7f9fc; border-bottom: 1px solid #e8ecf0; color: #1a1a2e; }
 .detail-table { width: 100%; border-collapse: collapse; }
-.detail-table th { background: #1a2a44; color: #fff; padding: 8px 12px;
+.detail-table th { background: #1a1a2e; color: #fff; padding: 8px 12px;
   font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; text-align: left; }
 .detail-table td { padding: 6px 12px; border-bottom: 1px solid #e8ecf0; font-size: 12px; }
 .detail-count { color: #1E8449; font-weight: 700; font-size: 11px; }

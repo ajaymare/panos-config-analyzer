@@ -1,9 +1,14 @@
 """PAN-OS SD-WAN Configuration Parser — Flask App."""
+import json
 import os
+import signal
+import subprocess
+import time
 import uuid
 import xml.etree.ElementTree as ET
+import zipfile
 
-from flask import Flask, render_template, request, send_file, jsonify
+from flask import Flask, render_template, request, send_file, jsonify, Response
 
 import config as app_config
 from parsers import config_detector, registry
@@ -11,9 +16,29 @@ from parsers.base import FeatureResult
 from report import excel_generator
 from report.html_dashboard import generate_dashboard_fragment
 from report.masker import mask_results
+from report.migration_dashboard import generate_migration_dashboard_fragment
+from scm.ansible_generator import generate_ansible_zip
+from scm.mapper import map_results
+from scm.migration_report import generate_migration_report
+from sizing.calculator import calculate_sizing
+from sizing.html_dashboard import generate_sizing_dashboard
+from sizing.excel_report import generate_sizing_report
 
 app = Flask(__name__)
 app.config['MAX_CONTENT_LENGTH'] = app_config.MAX_CONTENT_LENGTH
+
+# In-memory session cache for parsed results (for Ansible generation)
+# Key: session_id, Value: {'configs_data': [...], 'timestamp': float}
+_session_cache: dict[str, dict] = {}
+_SESSION_TTL = 1800  # 30 minutes
+
+
+def _cache_cleanup():
+    """Remove expired session cache entries."""
+    now = time.time()
+    expired = [k for k, v in _session_cache.items() if now - v['timestamp'] > _SESSION_TTL]
+    for k in expired:
+        del _session_cache[k]
 
 # SD-WAN features that are managed by Panorama (not present in NGFW exports)
 _PANORAMA_SDWAN_FEATURES = {
@@ -225,12 +250,20 @@ def parse():
         # Generate dashboard HTML fragment
         dashboard_html = generate_dashboard_fragment(configs_data)
 
+        # Cache parsed results for Ansible generation
+        _cache_cleanup()
+        _session_cache[session_id] = {
+            'configs_data': configs_data,
+            'timestamp': time.time(),
+        }
+
         # Return JSON with dashboard HTML and scoped Excel download URL
         excel_filename = os.path.basename(excel_path)
         return jsonify({
             'dashboard_html': dashboard_html,
             'excel_url': f'/download/{session_id}/{excel_filename}',
             'excel_filename': excel_filename,
+            'session_id': session_id,
         })
 
     except ValueError as e:
@@ -256,6 +289,365 @@ def download(session_id, filename):
         download_name=filename,
         mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
     )
+
+
+@app.route('/parse-migration', methods=['POST'])
+def parse_migration():
+    """Parse XML configs and generate SCM migration analysis dashboard + Ansible ZIP."""
+    try:
+        session_id, session_dir = _make_session_dir()
+
+        files = request.files.getlist('config_files')
+        if not files or all(f.filename == '' for f in files):
+            return jsonify({'error': 'No file selected'}), 400
+
+        configs_data = []
+        for f in files:
+            if f.filename == '':
+                continue
+            display_name = os.path.splitext(f.filename)[0]
+            config_data = _parse_single_xml(f.stream, display_name)
+            configs_data.append(config_data)
+
+        if not configs_data:
+            return jsonify({'error': 'No valid files uploaded'}), 400
+
+        _apply_panorama_correlation(configs_data)
+
+        # Collect all results
+        all_results = []
+        for cfg in configs_data:
+            all_results.extend(cfg['results'])
+
+        # Get selected SCM features from form
+        selected_features = request.form.getlist('scm_features')
+        if not selected_features:
+            selected_features = None
+
+        # Get optional SCM credentials from form
+        credentials = None
+        cid = request.form.get('scm_client_id', '').strip()
+        csec = request.form.get('scm_client_secret', '').strip()
+        ctsg = request.form.get('scm_tsg_id', '').strip()
+        if cid or csec or ctsg:
+            credentials = {'client_id': cid, 'client_secret': csec, 'tsg_id': ctsg}
+
+        # Map results to SCM payloads
+        mapped = map_results(all_results)
+        if selected_features is not None:
+            mapped_filtered = {k: v for k, v in mapped.items() if k in selected_features}
+        else:
+            mapped_filtered = mapped
+
+        # Generate Ansible ZIP
+        zip_path = generate_ansible_zip(
+            all_results, session_dir,
+            selected_features=selected_features,
+            credentials=credentials,
+        )
+        zip_filename = os.path.basename(zip_path)
+
+        # Extract playbooks for in-tool execution
+        playbook_dir = os.path.join(session_dir, 'playbooks')
+        with zipfile.ZipFile(zip_path, 'r') as zf:
+            zf.extractall(playbook_dir)
+        # The ZIP has a top-level scm-ansible-playbooks/ prefix
+        playbook_root = os.path.join(playbook_dir, 'scm-ansible-playbooks')
+
+        # Generate migration report Excel
+        report_bytes = generate_migration_report(
+            all_results, selected_features=selected_features, mapped=mapped_filtered,
+        )
+        report_filename = 'SCM_Migration_Report.xlsx'
+        report_path = os.path.join(session_dir, report_filename)
+        with open(report_path, 'wb') as rf:
+            rf.write(report_bytes)
+
+        # Generate migration dashboard HTML
+        dashboard_html = generate_migration_dashboard_fragment(
+            all_results,
+            selected_features=selected_features,
+            mapped=mapped_filtered,
+            configs_data=configs_data,
+        )
+
+        # Cache for later use (including playbook path for execution)
+        _cache_cleanup()
+        _session_cache[session_id] = {
+            'configs_data': configs_data,
+            'playbook_root': playbook_root,
+            'timestamp': time.time(),
+        }
+
+        return jsonify({
+            'dashboard_html': dashboard_html,
+            'ansible_url': f'/download-ansible/{session_id}/{zip_filename}',
+            'ansible_filename': zip_filename,
+            'excel_url': f'/download/{session_id}/{report_filename}',
+            'excel_filename': report_filename,
+            'session_id': session_id,
+        })
+
+    except ValueError as e:
+        return jsonify({'error': str(e)}), 400
+    except Exception as e:
+        return jsonify({'error': f'Unexpected error: {e}'}), 500
+
+
+@app.route('/generate-ansible/<session_id>', methods=['POST'])
+def generate_ansible(session_id):
+    """Generate Ansible playbook ZIP from cached parsed results."""
+    if '..' in session_id or '/' in session_id:
+        return jsonify({'error': 'Invalid session'}), 400
+
+    _cache_cleanup()
+    cached = _session_cache.get(session_id)
+    if not cached:
+        return jsonify({'error': 'Session expired. Please re-upload and parse your config files.'}), 404
+
+    try:
+        # Collect all FeatureResults across all configs
+        all_results = []
+        for cfg in cached['configs_data']:
+            all_results.extend(cfg['results'])
+
+        # Get selected features from request body (if provided)
+        selected_features = None
+        if request.is_json and request.json:
+            selected_features = request.json.get('selected_features')
+
+        session_dir = os.path.join(app_config.REPORT_DIR, session_id)
+        os.makedirs(session_dir, exist_ok=True)
+
+        zip_path = generate_ansible_zip(
+            all_results, session_dir,
+            selected_features=selected_features,
+        )
+        zip_filename = os.path.basename(zip_path)
+
+        return jsonify({
+            'ansible_url': f'/download-ansible/{session_id}/{zip_filename}',
+            'ansible_filename': zip_filename,
+        })
+    except Exception as e:
+        return jsonify({'error': f'Failed to generate Ansible playbooks: {e}'}), 500
+
+
+@app.route('/download-ansible/<session_id>/<filename>')
+def download_ansible(session_id, filename):
+    """Serve an Ansible playbook ZIP file scoped to a session directory."""
+    if '..' in session_id or '..' in filename or '/' in session_id:
+        return 'Invalid request', 400
+
+    filepath = os.path.join(app_config.REPORT_DIR, session_id, filename)
+    if not os.path.exists(filepath):
+        return 'File not found or expired', 404
+
+    return send_file(
+        filepath,
+        as_attachment=True,
+        download_name=filename,
+        mimetype='application/zip',
+    )
+
+
+def _get_playbook_root(session_id: str) -> str | None:
+    """Resolve playbook root directory for a session (works across workers)."""
+    playbook_root = os.path.join(app_config.REPORT_DIR, session_id, 'playbooks', 'scm-ansible-playbooks')
+    if os.path.isdir(playbook_root):
+        return playbook_root
+    # Also check session cache (same worker)
+    cached = _session_cache.get(session_id)
+    if cached and 'playbook_root' in cached and os.path.isdir(cached['playbook_root']):
+        return cached['playbook_root']
+    return None
+
+
+@app.route('/playbook-list/<session_id>')
+def playbook_list(session_id):
+    """List available playbooks for a session."""
+    if '..' in session_id or '/' in session_id:
+        return jsonify({'error': 'Invalid session'}), 400
+
+    playbook_root = _get_playbook_root(session_id)
+    if not playbook_root:
+        return jsonify({'error': 'Session expired. Please re-upload your config.'}), 404
+
+    playbooks = sorted(
+        f for f in os.listdir(playbook_root)
+        if f.endswith('.yml') and not f.startswith('.')
+    )
+    return jsonify({'playbooks': playbooks})
+
+
+@app.route('/run-playbook/<session_id>', methods=['POST'])
+def run_playbook(session_id):
+    """Run one or more Ansible playbooks sequentially and stream output via SSE."""
+    if '..' in session_id or '/' in session_id:
+        return jsonify({'error': 'Invalid session'}), 400
+
+    playbook_root = _get_playbook_root(session_id)
+    if not playbook_root:
+        return jsonify({'error': 'Session expired. Please re-upload your config.'}), 404
+
+    cached = _session_cache.get(session_id) or {}
+
+    data = request.get_json(force=True)
+    creds = data.get('credentials', {})
+
+    # Accept single playbook or list of playbooks
+    playbooks = data.get('playbooks', [])
+    if not playbooks:
+        single = data.get('playbook', '')
+        if single:
+            playbooks = [single]
+    if not playbooks:
+        return jsonify({'error': 'No playbooks specified'}), 400
+
+    # Validate all playbook names
+    for pb in playbooks:
+        if not pb or '..' in pb or '/' in pb:
+            return jsonify({'error': f'Invalid playbook name: {pb}'}), 400
+        if not os.path.isfile(os.path.join(playbook_root, pb)):
+            return jsonify({'error': f'Playbook not found: {pb}'}), 404
+
+    # Validate credentials
+    client_id = creds.get('client_id', '').strip()
+    client_secret = creds.get('client_secret', '').strip()
+    tsg_id = creds.get('tsg_id', '').strip()
+    if not client_id or not client_secret or not tsg_id:
+        return jsonify({'error': 'All SCM credentials (Client ID, Client Secret, TSG ID) are required.'}), 400
+
+    # Write credentials to the playbook working directory
+    import yaml
+    creds_path = os.path.join(playbook_root, 'group_vars', 'all', 'scm_credentials.yml')
+    creds_data = {
+        'scm_client_id': client_id,
+        'scm_client_secret': client_secret,
+        'scm_tsg_id': tsg_id,
+        'scm_auth_url': 'https://auth.apps.paloaltonetworks.com/am/oauth2/access_token',
+        'scm_base_url': 'https://api.sase.paloaltonetworks.com',
+    }
+    with open(creds_path, 'w') as cf:
+        yaml.dump(creds_data, cf, default_flow_style=False)
+
+    def generate():
+        """SSE generator that runs playbooks sequentially and streams output."""
+        total = len(playbooks)
+        for idx, playbook in enumerate(playbooks, 1):
+            # Send playbook start event
+            yield f'event: playbook_start\ndata: {json.dumps({"playbook": playbook, "index": idx, "total": total})}\n\n'
+
+            try:
+                proc = subprocess.Popen(
+                    ['ansible-playbook', '-i', 'inventory/hosts.yml', playbook, '-v'],
+                    cwd=playbook_root,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.STDOUT,
+                    text=True,
+                    bufsize=1,
+                    env={**os.environ, 'ANSIBLE_FORCE_COLOR': '0', 'PYTHONUNBUFFERED': '1'},
+                )
+                cached['process'] = proc
+
+                for line in iter(proc.stdout.readline, ''):
+                    escaped = json.dumps(line.rstrip('\n'))
+                    yield f'data: {escaped}\n\n'
+
+                proc.wait()
+                exit_code = proc.returncode
+
+                yield f'event: playbook_end\ndata: {json.dumps({"playbook": playbook, "index": idx, "total": total, "exit_code": exit_code})}\n\n'
+
+                # Stop running remaining playbooks if one fails
+                if exit_code != 0:
+                    yield f'data: {json.dumps(f"Playbook {playbook} failed — stopping queue.")}\n\n'
+                    yield f'event: done\ndata: {json.dumps({"exit_code": exit_code, "stopped_at": playbook})}\n\n'
+                    return
+
+            except FileNotFoundError:
+                yield f'data: {json.dumps("ERROR: ansible-playbook not found.")}\n\n'
+                yield f'event: done\ndata: {json.dumps({"exit_code": 127})}\n\n'
+                return
+            except Exception as e:
+                yield f'data: {json.dumps(f"ERROR: {str(e)}")}\n\n'
+                yield f'event: done\ndata: {json.dumps({"exit_code": 1})}\n\n'
+                return
+            finally:
+                cached.pop('process', None)
+
+        # All playbooks completed successfully
+        yield f'event: done\ndata: {json.dumps({"exit_code": 0})}\n\n'
+
+    return Response(generate(), mimetype='text/event-stream',
+                    headers={'Cache-Control': 'no-cache', 'X-Accel-Buffering': 'no'})
+
+
+@app.route('/stop-playbook/<session_id>', methods=['POST'])
+def stop_playbook(session_id):
+    """Stop a running Ansible playbook."""
+    if '..' in session_id or '/' in session_id:
+        return jsonify({'error': 'Invalid session'}), 400
+
+    cached = _session_cache.get(session_id)
+    if not cached:
+        return jsonify({'error': 'Session not found'}), 404
+
+    proc = cached.get('process')
+    if proc and proc.poll() is None:
+        proc.send_signal(signal.SIGTERM)
+        try:
+            proc.wait(timeout=5)
+        except subprocess.TimeoutExpired:
+            proc.kill()
+        return jsonify({'stopped': True})
+
+    return jsonify({'stopped': False, 'message': 'No running playbook'})
+
+
+@app.route('/calculate-sizing', methods=['POST'])
+def sizing():
+    """Calculate PA firewall sizing recommendation for SD-WAN deployment."""
+    try:
+        session_id, session_dir = _make_session_dir()
+
+        inputs = {
+            'num_hubs': int(request.form.get('num_hubs', 1)),
+            'num_branches': int(request.form.get('num_branches', 1)),
+            'hub_public_isps': int(request.form.get('hub_public_isps', 1)),
+            'hub_private_isps': int(request.form.get('hub_private_isps', 0)),
+            'branch_public_isps': int(request.form.get('branch_public_isps', 1)),
+            'branch_private_isps': int(request.form.get('branch_private_isps', 0)),
+            'hub_bandwidth_mbps': int(request.form.get('hub_bandwidth_mbps', 1000)),
+            'branch_bandwidth_mbps': int(request.form.get('branch_bandwidth_mbps', 100)),
+            'hub_sessions': int(request.form.get('hub_sessions', 500000)),
+            'branch_sessions': int(request.form.get('branch_sessions', 50000)),
+            'threat_prevention': request.form.get('threat_prevention') == 'yes',
+            'ssl_decryption': request.form.get('ssl_decryption') == 'yes',
+            'url_filtering': request.form.get('url_filtering') == 'yes',
+            'wildfire': request.form.get('wildfire') == 'yes',
+            'dns_security': request.form.get('dns_security') == 'yes',
+            'hub_ha': request.form.get('hub_ha') == 'yes',
+            'branch_ha_count': int(request.form.get('branch_ha_count', 0)),
+            'platform': request.form.get('platform', 'hardware'),
+        }
+
+        result = calculate_sizing(inputs)
+        dashboard_html = generate_sizing_dashboard(result)
+        excel_path = generate_sizing_report(result, output_dir=session_dir)
+        excel_filename = os.path.basename(excel_path)
+
+        return jsonify({
+            'dashboard_html': dashboard_html,
+            'excel_url': f'/download/{session_id}/{excel_filename}',
+            'excel_filename': excel_filename,
+            'session_id': session_id,
+        })
+
+    except ValueError as e:
+        return jsonify({'error': str(e)}), 400
+    except Exception as e:
+        return jsonify({'error': f'Unexpected error: {e}'}), 500
 
 
 if __name__ == '__main__':

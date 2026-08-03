@@ -3,3 +3,4 @@ gunicorn>=22.0
 openpyxl>=3.1
 pan-os-python>=1.12
 lxml>=5.0
+pyyaml>=6.0

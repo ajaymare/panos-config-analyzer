@@ -3,32 +3,61 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>PAN-OS SD-WAN Config Parser</title>
+    <title>PAN-OS SD-WAN Toolkit</title>
     <link rel="stylesheet" href="/static/style.css">
 </head>
 <body>
 
 <div class="header">
-    <h1>PAN-OS SD-WAN Configuration Parser</h1>
-    <p>Upload config XMLs to generate an SD-WAN feature report</p>
+    <h1>PAN-OS SD-WAN Toolkit</h1>
+    <p>SD-WAN configuration analysis, SCM migration, and firewall sizing recommendations</p>
 </div>
 
-<div class="container" id="form-section">
+<!-- Landing: choose mode -->
+<div class="container" id="landing-section">
+    <div class="mode-cards">
+        <div class="mode-card" onclick="selectMode('report')">
+            <div class="mode-icon">&#128202;</div>
+            <h3>Generate Report</h3>
+            <p>Parse PAN-OS SD-WAN config and generate an Excel report with deployment scoring, gap analysis, and feature comparison</p>
+        </div>
+        <div class="mode-card" onclick="selectMode('scm')">
+            <div class="mode-icon">&#9881;</div>
+            <h3>Generate SCM Config</h3>
+            <p>Convert PAN-OS SD-WAN configuration to SCM-compatible Ansible playbooks for automated migration to Strata Cloud Manager</p>
+        </div>
+        <div class="mode-card" onclick="selectMode('sizing')">
+            <div class="mode-icon">&#128290;</div>
+            <h3>Sizing Calculator</h3>
+            <p>Get PA firewall sizing recommendations for SD-WAN deployments based on bandwidth, sessions, tunnels, and security requirements</p>
+        </div>
+    </div>
+</div>
+
+<!-- Upload form (shared by both modes) -->
+<div class="container" id="form-section" style="display:none;">
     {% if error %}
     <div class="alert alert-error">{{ error }}</div>
     {% endif %}
 
+    <div style="margin-bottom:12px;">
+        <button class="btn-back" onclick="showLanding()">&larr; Back</button>
+    </div>
+
     <div class="card">
-        <div class="card-header">Upload XML Files</div>
+        <div class="card-header" id="form-card-header">Upload XML Files</div>
         <div style="padding: 20px;">
             <form method="POST" action="/parse" enctype="multipart/form-data" id="upload-form">
                 <input type="hidden" name="method" value="upload">
+                <input type="hidden" name="mode" value="report" id="mode-input">
                 <div class="form-group">
                     <label>Configuration XML Files</label>
                     <input type="file" name="config_files" accept=".xml,.txt" multiple required id="file-input">
                 </div>
                 <div class="file-list" id="file-list"></div>
-                <div class="mask-section">
+
+                <!-- Masking options (report mode only) -->
+                <div class="mask-section" id="mask-section">
                     <div class="mask-header">
                         <span class="mask-title">Mask Sensitive Information</span>
                         <label class="mask-toggle"><input type="checkbox" id="mask-all" onchange="toggleAllMask()"> Select All</label>
@@ -42,6 +71,58 @@
                         <label><input type="checkbox" name="mask_categories" value="network" class="mask-cb"> Network Addresses</label>
                     </div>
                 </div>
+
+                <!-- SCM feature selection (scm mode only) -->
+                <div id="scm-feature-section" style="display:none;">
+                    <div class="mask-section">
+                        <div class="mask-header">
+                            <span class="mask-title">Select SD-WAN Objects to Migrate</span>
+                            <label class="mask-toggle"><input type="checkbox" id="scm-select-all" onchange="toggleAllScm()" checked> Select All</label>
+                        </div>
+                        <div class="mask-grid">
+                            <label><input type="checkbox" class="scm-feat" value="sdwan_vpn_clusters" checked> SD-WAN VPN Clusters</label>
+                            <label><input type="checkbox" class="scm-feat" value="sdwan_devices" checked> SD-WAN Devices</label>
+                            <label><input type="checkbox" class="scm-feat" value="sdwan_interface_profiles" checked> SD-WAN Interface Profiles</label>
+                            <label><input type="checkbox" class="scm-feat" value="sdwan_path_quality_profiles" checked> Path Quality Profiles</label>
+                            <label><input type="checkbox" class="scm-feat" value="sdwan_traffic_distribution_profiles" checked> Traffic Distribution Profiles</label>
+                            <label><input type="checkbox" class="scm-feat" value="sdwan_policies" checked> SD-WAN Policies (App-ID)</label>
+                            <label><input type="checkbox" class="scm-feat" value="security_rules" checked> Security Rules</label>
+                            <label><input type="checkbox" class="scm-feat" value="nat_rules" checked> NAT Rules</label>
+                            <label><input type="checkbox" class="scm-feat" value="ike_gateways" checked> IKE Gateways</label>
+                            <label><input type="checkbox" class="scm-feat" value="ipsec_tunnels" checked> IPSec Tunnels</label>
+                            <label><input type="checkbox" class="scm-feat" value="bgp_routing_profiles" checked> BGP Routing Profiles</label>
+                            <label><input type="checkbox" class="scm-feat" value="sdwan_bgp_policies" checked> SD-WAN BGP Policies</label>
+                            <label><input type="checkbox" class="scm-feat" value="interfaces" checked> Interfaces</label>
+                            <label><input type="checkbox" class="scm-feat" value="zones" checked> Zones</label>
+                            <label><input type="checkbox" class="scm-feat" value="custom_applications" checked> Custom Applications</label>
+                        </div>
+                    </div>
+
+                    <div class="mask-section">
+                        <div class="mask-header">
+                            <span class="mask-title">SCM Credentials (Optional)</span>
+                            <span style="font-size:11px; color:var(--text-secondary);">Pre-fills Ansible playbooks</span>
+                        </div>
+                        <p style="font-size:11px; color:var(--text-secondary); margin-bottom:10px;">
+                            Leave blank to use placeholders. You can edit <code>scm_credentials.yml</code> in the downloaded ZIP later.
+                        </p>
+                        <div class="scm-creds-grid">
+                            <div class="form-group">
+                                <label>Client ID</label>
+                                <input type="text" name="scm_client_id" id="scm-client-id" placeholder="YOUR_CLIENT_ID_HERE" autocomplete="off">
+                            </div>
+                            <div class="form-group">
+                                <label>Client Secret</label>
+                                <input type="password" name="scm_client_secret" id="scm-client-secret" placeholder="YOUR_CLIENT_SECRET_HERE" autocomplete="off">
+                            </div>
+                            <div class="form-group">
+                                <label>TSG ID</label>
+                                <input type="text" name="scm_tsg_id" id="scm-tsg-id" placeholder="YOUR_TSG_ID_HERE" autocomplete="off">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
                 <p class="info-text">
                     Upload one or multiple configs. Multiple files produces a <strong>comparison report</strong>.<br>
                     <strong>Panorama:</strong> Device &rarr; Setup &rarr; Operations &rarr; Export named configuration snapshot<br>
@@ -55,28 +136,418 @@
     </div>
 
     <div class="spinner" id="spinner">
-        <p style="margin-top: 12px; font-size: 13px; color: var(--text-secondary);">
+        <p style="margin-top: 12px; font-size: 13px; color: var(--text-secondary);" id="spinner-text">
             Parsing configuration and generating report...
         </p>
     </div>
 </div>
 
-<!-- Dashboard Results (shown after parsing) -->
+<!-- Report Dashboard Results (shown after parsing in report mode) -->
 <div id="results-section" style="display:none;">
     <div style="max-width: 1100px; margin: 0 auto; padding: 16px;">
         <div class="dashboard-actions">
             <a id="excel-download-btn" class="btn btn-success" href="#" download style="width:auto; text-decoration:none;">Download Excel Report</a>
-            <button class="btn btn-secondary" onclick="showForm()" style="width:auto;">New Analysis</button>
+            <button id="ansible-toggle-btn" class="btn btn-primary" onclick="toggleAnsiblePanel()" style="width:auto;">Download Ansible Playbooks</button>
+            <button class="btn btn-secondary" onclick="showLanding()" style="width:auto;">New Analysis</button>
+        </div>
+
+        <!-- Ansible Feature Selection Panel -->
+        <div id="ansible-panel" style="display:none; margin-top:16px;">
+            <div style="background:#fff; border:1px solid #d4dbe6; border-radius:10px; padding:20px; box-shadow:0 2px 8px rgba(0,0,0,0.06);">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px;">
+                    <span style="font-size:13px; font-weight:600; color:#1a1a2e;">Select SD-WAN Objects to Migrate</span>
+                    <label style="font-size:12px; color:#fa582d; font-weight:600; cursor:pointer; display:flex; align-items:center; gap:4px;">
+                        <input type="checkbox" id="ansible-select-all" onchange="toggleAllAnsible()" checked style="width:14px;height:14px;cursor:pointer;"> Select All
+                    </label>
+                </div>
+                <div style="display:grid; grid-template-columns:1fr 1fr; gap:6px 24px;">
+                    <label class="ansible-feat-label"><input type="checkbox" class="ansible-feat" value="sdwan_vpn_clusters" checked> SD-WAN VPN Clusters</label>
+                    <label class="ansible-feat-label"><input type="checkbox" class="ansible-feat" value="sdwan_devices" checked> SD-WAN Devices</label>
+                    <label class="ansible-feat-label"><input type="checkbox" class="ansible-feat" value="sdwan_interface_profiles" checked> SD-WAN Interface Profiles</label>
+                    <label class="ansible-feat-label"><input type="checkbox" class="ansible-feat" value="sdwan_path_quality_profiles" checked> Path Quality Profiles</label>
+                    <label class="ansible-feat-label"><input type="checkbox" class="ansible-feat" value="sdwan_traffic_distribution_profiles" checked> Traffic Distribution Profiles</label>
+                    <label class="ansible-feat-label"><input type="checkbox" class="ansible-feat" value="sdwan_policies" checked> SD-WAN Policies (App-ID)</label>
+                    <label class="ansible-feat-label"><input type="checkbox" class="ansible-feat" value="security_rules" checked> Security Rules</label>
+                    <label class="ansible-feat-label"><input type="checkbox" class="ansible-feat" value="nat_rules" checked> NAT Rules</label>
+                    <label class="ansible-feat-label"><input type="checkbox" class="ansible-feat" value="ike_gateways" checked> IKE Gateways</label>
+                    <label class="ansible-feat-label"><input type="checkbox" class="ansible-feat" value="ipsec_tunnels" checked> IPSec Tunnels</label>
+                    <label class="ansible-feat-label"><input type="checkbox" class="ansible-feat" value="bgp_routing_profiles" checked> BGP Routing Profiles</label>
+                    <label class="ansible-feat-label"><input type="checkbox" class="ansible-feat" value="sdwan_bgp_policies" checked> SD-WAN BGP Policies</label>
+                    <label class="ansible-feat-label"><input type="checkbox" class="ansible-feat" value="interfaces" checked> Interfaces</label>
+                    <label class="ansible-feat-label"><input type="checkbox" class="ansible-feat" value="zones" checked> Zones</label>
+                    <label class="ansible-feat-label"><input type="checkbox" class="ansible-feat" value="custom_applications" checked> Custom Applications</label>
+                </div>
+                <div style="margin-top:16px; display:flex; gap:10px;">
+                    <button id="ansible-download-btn" class="btn btn-primary" onclick="downloadAnsible()" style="width:auto;">Generate &amp; Download</button>
+                    <button class="btn btn-secondary" onclick="toggleAnsiblePanel()" style="width:auto;">Cancel</button>
+                </div>
+            </div>
         </div>
     </div>
     <div class="dashboard-results" id="dashboard-content"></div>
 </div>
 
+<!-- Migration Dashboard Results (shown after parsing in SCM mode) -->
+<div id="migration-results-section" style="display:none;">
+    <div style="max-width: 1100px; margin: 0 auto; padding: 16px;">
+        <div class="dashboard-actions">
+            <a id="migration-ansible-btn" class="btn btn-primary" href="#" download style="width:auto; text-decoration:none;">Download Ansible Playbooks</a>
+            <a id="migration-excel-btn" class="btn btn-success" href="#" download style="width:auto; text-decoration:none;">Download Migration Report</a>
+            <button class="btn btn-secondary" onclick="showLanding()" style="width:auto;">New Analysis</button>
+        </div>
+
+        <!-- Deploy to SCM Panel -->
+        <div class="deploy-panel" id="deploy-panel">
+            <div class="deploy-panel-header" onclick="toggleDeployPanel()">
+                <h4>Deploy to SCM</h4>
+                <span class="toggle-icon" id="deploy-toggle-icon">&#9660;</span>
+            </div>
+            <div class="deploy-panel-body" id="deploy-panel-body">
+                <div style="margin-bottom:14px;">
+                    <div style="font-size:12px; font-weight:600; color:var(--text-primary); margin-bottom:8px;">SCM Credentials</div>
+                    <div class="deploy-creds-grid">
+                        <div>
+                            <label>Client ID</label>
+                            <input type="text" id="deploy-client-id" placeholder="SCM Client ID" autocomplete="off">
+                        </div>
+                        <div>
+                            <label>Client Secret</label>
+                            <input type="password" id="deploy-client-secret" placeholder="SCM Client Secret" autocomplete="off">
+                        </div>
+                        <div>
+                            <label>TSG ID</label>
+                            <input type="text" id="deploy-tsg-id" placeholder="SCM TSG ID" autocomplete="off">
+                        </div>
+                    </div>
+                </div>
+
+                <div style="margin-bottom:12px;">
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+                        <div style="font-size:12px; font-weight:600; color:var(--text-primary);">Playbook Queue</div>
+                        <div style="display:flex; gap:8px; align-items:center;">
+                            <select id="playbook-select" class="playbook-select" style="min-width:240px;">
+                                <option value="">Loading playbooks...</option>
+                            </select>
+                            <button class="btn-add-playbook" onclick="addPlaybookToQueue()">+ Add</button>
+                        </div>
+                    </div>
+                    <div id="playbook-queue" class="playbook-queue">
+                        <div class="playbook-queue-empty">Add playbooks from the dropdown above. They will run in order.</div>
+                    </div>
+                    <div style="margin-top:10px; display:flex; gap:8px; align-items:center;">
+                        <button class="btn-run" id="run-btn" onclick="runPlaybook()">Run All</button>
+                        <button class="btn-secondary" onclick="clearPlaybookQueue()" style="padding:7px 14px; font-size:12px;">Clear</button>
+                        <span id="queue-count" style="font-size:11px; color:var(--text-secondary);"></span>
+                    </div>
+                </div>
+
+                <div class="terminal-wrapper" id="terminal-wrapper" style="display:none;">
+                    <div class="terminal-header">
+                        <span id="terminal-title">$ ansible-playbook</span>
+                        <div style="display:flex; align-items:center; gap:8px;">
+                            <span class="run-status idle" id="run-status">Idle</span>
+                            <button class="btn-stop" id="stop-btn" onclick="stopPlaybook()" style="display:none;">Stop</button>
+                        </div>
+                    </div>
+                    <pre class="terminal-output" id="terminal-output"></pre>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="dashboard-results" id="migration-dashboard-content"></div>
+</div>
+
+<!-- Sizing Calculator Form -->
+<div class="container" id="sizing-form-section" style="display:none;">
+    <div style="margin-bottom:12px;">
+        <button class="btn-back" onclick="showLanding()">&larr; Back</button>
+    </div>
+
+    <div class="card">
+        <div class="card-header">SD-WAN Firewall Sizing Calculator</div>
+        <div style="padding: 20px;">
+            <form id="sizing-form" onsubmit="submitSizing(event)">
+
+                <div class="sizing-section-title">Deployment Overview</div>
+                <div class="sizing-input-grid">
+                    <div class="form-group">
+                        <label>Number of Hub Sites</label>
+                        <input type="number" name="num_hubs" id="sz-num-hubs" min="1" value="1" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Number of Branch Sites</label>
+                        <input type="number" name="num_branches" id="sz-num-branches" min="1" value="10" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Platform</label>
+                        <div class="sizing-platform-toggle">
+                            <label class="platform-option">
+                                <input type="radio" name="platform" value="hardware" checked>
+                                <span class="platform-label">&#128187; Hardware</span>
+                            </label>
+                            <label class="platform-option">
+                                <input type="radio" name="platform" value="virtual">
+                                <span class="platform-label">&#9729; VM-Series</span>
+                            </label>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="sizing-section-title">Security Features <span class="sizing-section-subtitle">Features that affect firewall throughput and sizing</span></div>
+                <div class="sizing-security-grid">
+                    <label class="sizing-security-toggle">
+                        <div class="toggle-switch">
+                            <input type="checkbox" name="threat_prevention" id="sz-tp" value="yes">
+                            <span class="toggle-slider"></span>
+                        </div>
+                        <div class="sizing-security-info">
+                            <strong>Threat Prevention</strong>
+                            <span>IPS, Anti-Virus, Anti-Spyware, C2</span>
+                            <span class="sizing-impact-badge sizing-impact-high">High Impact</span>
+                        </div>
+                    </label>
+                    <label class="sizing-security-toggle">
+                        <div class="toggle-switch">
+                            <input type="checkbox" name="ssl_decryption" id="sz-ssl" value="yes">
+                            <span class="toggle-slider"></span>
+                        </div>
+                        <div class="sizing-security-info">
+                            <strong>SSL Decryption</strong>
+                            <span>SSL Forward Proxy / Inbound Inspection</span>
+                            <span class="sizing-impact-badge sizing-impact-high">High Impact</span>
+                        </div>
+                    </label>
+                    <label class="sizing-security-toggle">
+                        <div class="toggle-switch">
+                            <input type="checkbox" name="url_filtering" id="sz-url" value="yes">
+                            <span class="toggle-slider"></span>
+                        </div>
+                        <div class="sizing-security-info">
+                            <strong>URL Filtering</strong>
+                            <span>Web Content Filtering, Anti-Phishing</span>
+                            <span class="sizing-impact-badge sizing-impact-medium">Medium Impact</span>
+                        </div>
+                    </label>
+                    <label class="sizing-security-toggle">
+                        <div class="toggle-switch">
+                            <input type="checkbox" name="wildfire" id="sz-wf" value="yes">
+                            <span class="toggle-slider"></span>
+                        </div>
+                        <div class="sizing-security-info">
+                            <strong>WildFire</strong>
+                            <span>Cloud Malware Analysis, Zero-Day Prevention</span>
+                            <span class="sizing-impact-badge sizing-impact-medium">Medium Impact</span>
+                        </div>
+                    </label>
+                    <label class="sizing-security-toggle">
+                        <div class="toggle-switch">
+                            <input type="checkbox" name="dns_security" id="sz-dns" value="yes">
+                            <span class="toggle-slider"></span>
+                        </div>
+                        <div class="sizing-security-info">
+                            <strong>DNS Security</strong>
+                            <span>DNS-Layer Threat Protection</span>
+                            <span class="sizing-impact-badge sizing-impact-low">Low Impact</span>
+                        </div>
+                    </label>
+                </div>
+
+                <div class="sizing-section-title">Hub Site Requirements</div>
+                <div class="sizing-input-grid">
+                    <div class="form-group">
+                        <label>Hub Bandwidth (Mbps)</label>
+                        <select name="hub_bandwidth_mbps" id="sz-hub-bw">
+                            <option value="100">100 Mbps</option>
+                            <option value="200">200 Mbps</option>
+                            <option value="500">500 Mbps</option>
+                            <option value="1000" selected>1,000 Mbps (1 Gbps)</option>
+                            <option value="2000">2,000 Mbps (2 Gbps)</option>
+                            <option value="5000">5,000 Mbps (5 Gbps)</option>
+                            <option value="10000">10,000 Mbps (10 Gbps)</option>
+                            <option value="20000">20,000 Mbps (20 Gbps)</option>
+                            <option value="40000">40,000 Mbps (40 Gbps)</option>
+                            <option value="custom">Custom...</option>
+                        </select>
+                        <input type="number" id="sz-hub-bw-custom" style="display:none; margin-top:6px;" placeholder="Enter Mbps" min="1">
+                    </div>
+                    <div class="form-group">
+                        <label>Hub Concurrent Sessions</label>
+                        <select name="hub_sessions" id="sz-hub-sessions">
+                            <option value="100000">100,000</option>
+                            <option value="200000">200,000</option>
+                            <option value="500000" selected>500,000</option>
+                            <option value="1000000">1,000,000</option>
+                            <option value="2000000">2,000,000</option>
+                            <option value="5000000">5,000,000</option>
+                            <option value="10000000">10,000,000</option>
+                            <option value="custom">Custom...</option>
+                        </select>
+                        <input type="number" id="sz-hub-sessions-custom" style="display:none; margin-top:6px;" placeholder="Enter count" min="1">
+                    </div>
+                    <div class="form-group">
+                        <label>Hub HA (High Availability)</label>
+                        <div class="sizing-toggles" style="padding-top:6px;">
+                            <label class="sizing-toggle-label">
+                                <span>Enable HA for all hubs</span>
+                                <div class="toggle-switch">
+                                    <input type="checkbox" name="hub_ha" id="sz-hub-ha" value="yes">
+                                    <span class="toggle-slider"></span>
+                                </div>
+                            </label>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="sizing-section-title">Hub ISP Links (per hub)</div>
+                <div class="sizing-input-grid">
+                    <div class="form-group">
+                        <label>Public ISPs (Internet)</label>
+                        <input type="number" name="hub_public_isps" id="sz-hub-public" min="0" value="2" required>
+                        <span class="input-hint">Each public link creates tunnels to every branch public link</span>
+                    </div>
+                    <div class="form-group">
+                        <label>Private ISPs (MPLS / P2P)</label>
+                        <input type="number" name="hub_private_isps" id="sz-hub-private" min="0" value="1" required>
+                        <span class="input-hint">Each private link creates 1-to-1 tunnel with matching branch private link</span>
+                    </div>
+                </div>
+
+                <div class="sizing-section-title">Branch Site Requirements (per site)</div>
+                <div class="sizing-input-grid">
+                    <div class="form-group">
+                        <label>Branch Bandwidth (Mbps)</label>
+                        <select name="branch_bandwidth_mbps" id="sz-branch-bw">
+                            <option value="20">20 Mbps</option>
+                            <option value="50">50 Mbps</option>
+                            <option value="100" selected>100 Mbps</option>
+                            <option value="200">200 Mbps</option>
+                            <option value="500">500 Mbps</option>
+                            <option value="1000">1,000 Mbps (1 Gbps)</option>
+                            <option value="2000">2,000 Mbps (2 Gbps)</option>
+                            <option value="5000">5,000 Mbps (5 Gbps)</option>
+                            <option value="custom">Custom...</option>
+                        </select>
+                        <input type="number" id="sz-branch-bw-custom" style="display:none; margin-top:6px;" placeholder="Enter Mbps" min="1">
+                    </div>
+                    <div class="form-group">
+                        <label>Branch Concurrent Sessions</label>
+                        <select name="branch_sessions" id="sz-branch-sessions">
+                            <option value="10000">10,000</option>
+                            <option value="25000">25,000</option>
+                            <option value="50000" selected>50,000</option>
+                            <option value="100000">100,000</option>
+                            <option value="200000">200,000</option>
+                            <option value="500000">500,000</option>
+                            <option value="custom">Custom...</option>
+                        </select>
+                        <input type="number" id="sz-branch-sessions-custom" style="display:none; margin-top:6px;" placeholder="Enter count" min="1">
+                    </div>
+                    <div class="form-group">
+                        <label>Branches with HA</label>
+                        <input type="number" name="branch_ha_count" id="sz-branch-ha" min="0" value="0">
+                        <span class="input-hint">Number of branch sites requiring HA (0 = none)</span>
+                    </div>
+                </div>
+
+                <div class="sizing-section-title">Branch ISP Links (per branch)</div>
+                <div class="sizing-input-grid">
+                    <div class="form-group">
+                        <label>Public ISPs (Internet)</label>
+                        <input type="number" name="branch_public_isps" id="sz-branch-public" min="0" value="2" required>
+                        <span class="input-hint">Creates tunnels to ALL hub public links (1-to-many)</span>
+                    </div>
+                    <div class="form-group">
+                        <label>Private ISPs (MPLS / P2P)</label>
+                        <input type="number" name="branch_private_isps" id="sz-branch-private" min="0" value="0" required>
+                        <span class="input-hint">Creates 1-to-1 tunnel per matching hub private link</span>
+                    </div>
+                </div>
+
+                <br>
+                <button type="submit" class="btn btn-primary" id="sizing-btn">Calculate Sizing</button>
+            </form>
+        </div>
+    </div>
+
+    <div class="spinner" id="sizing-spinner">
+        <p style="margin-top: 12px; font-size: 13px; color: var(--text-secondary);">
+            Calculating optimal firewall sizing...
+        </p>
+    </div>
+</div>
+
+<!-- Sizing Results -->
+<div id="sizing-results-section" style="display:none;">
+    <div style="max-width: 1100px; margin: 0 auto; padding: 16px;">
+        <div class="dashboard-actions">
+            <a id="sizing-excel-btn" class="btn btn-success" href="#" download style="width:auto; text-decoration:none;">Download Excel Report</a>
+            <button class="btn btn-secondary" onclick="showLanding()" style="width:auto;">New Analysis</button>
+        </div>
+    </div>
+    <div class="dashboard-results" id="sizing-dashboard-content"></div>
+</div>
+
 <div class="footer" id="main-footer">
-    PAN-OS SD-WAN Config Parser &mdash; Supports Panorama &amp; NGFW configurations
+    PAN-OS SD-WAN Toolkit &mdash; Configuration Analysis, SCM Migration &amp; Firewall Sizing
 </div>
 
 <script>
+var currentMode = 'report';
+var currentSessionId = '';
+var selectedFiles = [];
+
+// ── Mode Switching ──────────────────────────────────────────
+
+function selectMode(mode) {
+    currentMode = mode;
+    document.getElementById('landing-section').style.display = 'none';
+    document.getElementById('sizing-form-section').style.display = 'none';
+    document.getElementById('form-section').style.display = 'none';
+
+    if (mode === 'sizing') {
+        document.getElementById('sizing-form-section').style.display = '';
+        initSizingDropdowns();
+        return;
+    }
+
+    document.getElementById('form-section').style.display = '';
+    document.getElementById('mode-input').value = mode;
+
+    if (mode === 'report') {
+        document.getElementById('mask-section').style.display = '';
+        document.getElementById('scm-feature-section').style.display = 'none';
+        document.getElementById('form-card-header').textContent = 'Upload XML Files — Configuration Analysis';
+        document.getElementById('upload-btn').textContent = selectedFiles.length > 1
+            ? 'Compare ' + selectedFiles.length + ' Configurations' : 'Generate Report';
+        document.getElementById('spinner-text').textContent = 'Parsing configuration and generating report...';
+    } else {
+        document.getElementById('mask-section').style.display = 'none';
+        document.getElementById('scm-feature-section').style.display = '';
+        document.getElementById('form-card-header').textContent = 'Upload XML Files — SCM Migration';
+        document.getElementById('upload-btn').textContent = 'Generate Migration Analysis';
+        document.getElementById('spinner-text').textContent = 'Parsing configuration and generating SCM migration analysis...';
+    }
+}
+
+function showLanding() {
+    document.getElementById('landing-section').style.display = '';
+    document.getElementById('form-section').style.display = 'none';
+    document.getElementById('results-section').style.display = 'none';
+    document.getElementById('migration-results-section').style.display = 'none';
+    document.getElementById('sizing-form-section').style.display = 'none';
+    document.getElementById('sizing-results-section').style.display = 'none';
+    document.getElementById('main-footer').style.display = '';
+}
+
+function showForm() {
+    document.getElementById('form-section').style.display = '';
+    document.getElementById('results-section').style.display = 'none';
+    document.getElementById('migration-results-section').style.display = 'none';
+    document.getElementById('main-footer').style.display = '';
+}
+
+// ── Masking Checkboxes ──────────────────────────────────────
+
 function toggleAllMask() {
     var allCb = document.getElementById('mask-all');
     var checkboxes = document.querySelectorAll('.mask-cb');
@@ -95,15 +566,22 @@ function updateSelectAll() {
     allCb.checked = allChecked;
 }
 
-document.addEventListener('DOMContentLoaded', function() {
-    var cbs = document.querySelectorAll('.mask-cb');
-    for (var i = 0; i < cbs.length; i++) {
-        cbs[i].addEventListener('change', function() { updateSelectAll(); });
-    }
-});
+// ── SCM Feature Checkboxes ──────────────────────────────────
 
-// Managed file list
-var selectedFiles = [];
+function toggleAllScm() {
+    var allCb = document.getElementById('scm-select-all');
+    var cbs = document.querySelectorAll('.scm-feat');
+    for (var i = 0; i < cbs.length; i++) cbs[i].checked = allCb.checked;
+}
+
+function updateScmSelectAll() {
+    var cbs = document.querySelectorAll('.scm-feat');
+    var all = true;
+    for (var i = 0; i < cbs.length; i++) { if (!cbs[i].checked) { all = false; break; } }
+    document.getElementById('scm-select-all').checked = all;
+}
+
+// ── File List Management ────────────────────────────────────
 
 function renderFileList() {
     var list = document.getElementById('file-list');
@@ -130,8 +608,14 @@ function renderFileList() {
         div.appendChild(removeBtn);
         list.appendChild(div);
     }
+    updateButtonText();
+}
+
+function updateButtonText() {
     var btn = document.getElementById('upload-btn');
-    if (selectedFiles.length > 1) {
+    if (currentMode === 'scm') {
+        btn.textContent = 'Generate Migration Analysis';
+    } else if (selectedFiles.length > 1) {
         btn.textContent = 'Compare ' + selectedFiles.length + ' Configurations';
     } else {
         btn.textContent = 'Generate Report';
@@ -146,6 +630,121 @@ function syncFilesToInput() {
     document.getElementById('file-input').files = dt.files;
 }
 
+// ── Dashboard Display ───────────────────────────────────────
+
+function showDashboard(html, excelUrl, sessionId) {
+    document.getElementById('form-section').style.display = 'none';
+    document.getElementById('main-footer').style.display = 'none';
+    document.getElementById('dashboard-content').innerHTML = html;
+    document.getElementById('excel-download-btn').href = excelUrl;
+    document.getElementById('results-section').style.display = '';
+    document.getElementById('migration-results-section').style.display = 'none';
+    currentSessionId = sessionId || '';
+    window.scrollTo(0, 0);
+}
+
+function showMigrationDashboard(html, ansibleUrl, excelUrl, sessionId) {
+    document.getElementById('form-section').style.display = 'none';
+    document.getElementById('main-footer').style.display = 'none';
+    document.getElementById('migration-dashboard-content').innerHTML = html;
+    document.getElementById('migration-ansible-btn').href = ansibleUrl;
+    document.getElementById('migration-excel-btn').href = excelUrl;
+    document.getElementById('results-section').style.display = 'none';
+    document.getElementById('migration-results-section').style.display = '';
+    // Pre-fill deploy credentials from upload form
+    var cid = document.getElementById('scm-client-id');
+    var csec = document.getElementById('scm-client-secret');
+    var ctsg = document.getElementById('scm-tsg-id');
+    if (cid && cid.value) document.getElementById('deploy-client-id').value = cid.value;
+    if (csec && csec.value) document.getElementById('deploy-client-secret').value = csec.value;
+    if (ctsg && ctsg.value) document.getElementById('deploy-tsg-id').value = ctsg.value;
+    // Load playbook list
+    if (sessionId) loadPlaybookList(sessionId);
+    window.scrollTo(0, 0);
+}
+
+// ── Ansible Panel (from report mode) ────────────────────────
+
+function toggleAnsiblePanel() {
+    var panel = document.getElementById('ansible-panel');
+    panel.style.display = panel.style.display === 'none' ? 'block' : 'none';
+}
+
+function toggleAllAnsible() {
+    var allCb = document.getElementById('ansible-select-all');
+    var cbs = document.querySelectorAll('.ansible-feat');
+    for (var i = 0; i < cbs.length; i++) cbs[i].checked = allCb.checked;
+}
+
+function updateAnsibleSelectAll() {
+    var cbs = document.querySelectorAll('.ansible-feat');
+    var all = true;
+    for (var i = 0; i < cbs.length; i++) { if (!cbs[i].checked) { all = false; break; } }
+    document.getElementById('ansible-select-all').checked = all;
+}
+
+function downloadAnsible() {
+    if (!currentSessionId) {
+        alert('Session expired. Please re-upload and parse your config files.');
+        return;
+    }
+    var selected = [];
+    var cbs = document.querySelectorAll('.ansible-feat:checked');
+    for (var i = 0; i < cbs.length; i++) selected.push(cbs[i].value);
+    if (selected.length === 0) {
+        alert('Please select at least one SD-WAN object to migrate.');
+        return;
+    }
+
+    var btn = document.getElementById('ansible-download-btn');
+    btn.disabled = true;
+    btn.textContent = 'Generating...';
+
+    fetch('/generate-ansible/' + currentSessionId, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({selected_features: selected})
+    })
+        .then(function(resp) {
+            return resp.json().then(function(data) {
+                if (!resp.ok) throw new Error(data.error || 'Failed to generate');
+                return data;
+            });
+        })
+        .then(function(data) {
+            btn.disabled = false;
+            btn.textContent = 'Generate & Download';
+            window.location.href = data.ansible_url;
+        })
+        .catch(function(err) {
+            btn.disabled = false;
+            btn.textContent = 'Generate & Download';
+            alert('Error: ' + err.message);
+        });
+}
+
+// ── Form Reset ──────────────────────────────────────────────
+
+function resetUI() {
+    document.getElementById('spinner').classList.remove('active');
+    var uploadBtn = document.getElementById('upload-btn');
+    uploadBtn.disabled = false;
+    updateButtonText();
+}
+
+// ── Event Listeners ─────────────────────────────────────────
+
+document.addEventListener('DOMContentLoaded', function() {
+    var maskCbs = document.querySelectorAll('.mask-cb');
+    for (var i = 0; i < maskCbs.length; i++) {
+        maskCbs[i].addEventListener('change', function() { updateSelectAll(); });
+    }
+    document.addEventListener('change', function(e) {
+        if (e.target.classList.contains('ansible-feat')) updateAnsibleSelectAll();
+        if (e.target.classList.contains('scm-feat')) updateScmSelectAll();
+    });
+});
+
 document.getElementById('file-input').addEventListener('change', function() {
     var files = this.files;
     for (var i = 0; i < files.length; i++) {
@@ -159,31 +758,7 @@ document.getElementById('file-input').addEventListener('change', function() {
     renderFileList();
 });
 
-function showForm() {
-    document.getElementById('form-section').style.display = '';
-    document.getElementById('results-section').style.display = 'none';
-    document.getElementById('main-footer').style.display = '';
-}
-
-function showDashboard(html, excelUrl) {
-    document.getElementById('form-section').style.display = 'none';
-    document.getElementById('main-footer').style.display = 'none';
-    document.getElementById('dashboard-content').innerHTML = html;
-    document.getElementById('excel-download-btn').href = excelUrl;
-    document.getElementById('results-section').style.display = '';
-    window.scrollTo(0, 0);
-}
-
-function resetUI() {
-    document.getElementById('spinner').classList.remove('active');
-    var uploadBtn = document.getElementById('upload-btn');
-    uploadBtn.disabled = false;
-    if (selectedFiles.length > 1) {
-        uploadBtn.textContent = 'Compare ' + selectedFiles.length + ' Configurations';
-    } else {
-        uploadBtn.textContent = 'Generate Report';
-    }
-}
+// ── Form Submit ─────────────────────────────────────────────
 
 document.getElementById('upload-form').addEventListener('submit', function(e) {
     e.preventDefault();
@@ -194,7 +769,17 @@ document.getElementById('upload-form').addEventListener('submit', function(e) {
 
     var formData = new FormData(this);
 
-    fetch('/parse', { method: 'POST', body: formData })
+    // Add selected SCM features to form data for migration mode
+    if (currentMode === 'scm') {
+        var scmCbs = document.querySelectorAll('.scm-feat:checked');
+        for (var i = 0; i < scmCbs.length; i++) {
+            formData.append('scm_features', scmCbs[i].value);
+        }
+    }
+
+    var endpoint = currentMode === 'scm' ? '/parse-migration' : '/parse';
+
+    fetch(endpoint, { method: 'POST', body: formData })
         .then(function(resp) {
             return resp.json().then(function(data) {
                 if (!resp.ok) {
@@ -205,7 +790,12 @@ document.getElementById('upload-form').addEventListener('submit', function(e) {
         })
         .then(function(data) {
             resetUI();
-            showDashboard(data.dashboard_html, data.excel_url);
+            if (currentMode === 'scm') {
+                currentSessionId = data.session_id || '';
+                showMigrationDashboard(data.dashboard_html, data.ansible_url, data.excel_url, data.session_id);
+            } else {
+                showDashboard(data.dashboard_html, data.excel_url, data.session_id);
+            }
         })
         .catch(function(err) {
             resetUI();
@@ -214,9 +804,405 @@ document.getElementById('upload-form').addEventListener('submit', function(e) {
             var div = document.createElement('div');
             div.className = 'alert alert-error';
             div.textContent = 'Error: ' + err.message;
-            document.querySelector('.container').insertBefore(div, document.querySelector('.card'));
+            var container = document.getElementById('form-section');
+            var card = container.querySelector('.card');
+            container.insertBefore(div, card);
         });
 });
+
+// ── Deploy to SCM Panel ─────────────────────────────────────
+
+var playbookQueue = [];
+
+function toggleDeployPanel() {
+    var body = document.getElementById('deploy-panel-body');
+    var icon = document.getElementById('deploy-toggle-icon');
+    if (body.classList.contains('collapsed')) {
+        body.classList.remove('collapsed');
+        icon.classList.add('open');
+    } else {
+        body.classList.add('collapsed');
+        icon.classList.remove('open');
+    }
+}
+
+function loadPlaybookList(sessionId) {
+    var select = document.getElementById('playbook-select');
+    select.innerHTML = '<option value="">Loading...</option>';
+    fetch('/playbook-list/' + sessionId)
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            select.innerHTML = '<option value="">-- Select a playbook to add --</option>';
+            if (data.playbooks && data.playbooks.length > 0) {
+                var configAll = [], deleteAll = [], configSingle = [], deleteSingle = [];
+                data.playbooks.forEach(function(p) {
+                    if (p === 'configure_all.yml') configAll.push(p);
+                    else if (p === 'delete_all.yml') deleteAll.push(p);
+                    else if (p.startsWith('configure_')) configSingle.push(p);
+                    else if (p.startsWith('delete_')) deleteSingle.push(p);
+                });
+                // Add optgroups
+                if (configAll.length || configSingle.length) {
+                    var grp = document.createElement('optgroup');
+                    grp.label = 'Configure';
+                    configAll.concat(configSingle).forEach(function(p) {
+                        var opt = document.createElement('option');
+                        opt.value = p;
+                        opt.textContent = p.replace('.yml', '').replace(/_/g, ' ');
+                        grp.appendChild(opt);
+                    });
+                    select.appendChild(grp);
+                }
+                if (deleteAll.length || deleteSingle.length) {
+                    var grp2 = document.createElement('optgroup');
+                    grp2.label = 'Delete';
+                    deleteAll.concat(deleteSingle).forEach(function(p) {
+                        var opt = document.createElement('option');
+                        opt.value = p;
+                        opt.textContent = p.replace('.yml', '').replace(/_/g, ' ');
+                        grp2.appendChild(opt);
+                    });
+                    select.appendChild(grp2);
+                }
+            } else {
+                select.innerHTML = '<option value="">No playbooks available</option>';
+            }
+        })
+        .catch(function() {
+            select.innerHTML = '<option value="">Failed to load playbooks</option>';
+        });
+}
+
+function addPlaybookToQueue() {
+    var select = document.getElementById('playbook-select');
+    var val = select.value;
+    if (!val) { alert('Select a playbook from the dropdown first.'); return; }
+    // Allow duplicates (user may want to run the same playbook twice)
+    playbookQueue.push(val);
+    renderPlaybookQueue();
+    select.value = '';
+}
+
+function removeFromQueue(idx) {
+    playbookQueue.splice(idx, 1);
+    renderPlaybookQueue();
+}
+
+function clearPlaybookQueue() {
+    playbookQueue = [];
+    renderPlaybookQueue();
+}
+
+function renderPlaybookQueue() {
+    var container = document.getElementById('playbook-queue');
+    var countEl = document.getElementById('queue-count');
+
+    if (playbookQueue.length === 0) {
+        container.innerHTML = '<div class="playbook-queue-empty">Add playbooks from the dropdown above. They will run in order.</div>';
+        countEl.textContent = '';
+        return;
+    }
+
+    var html = '';
+    playbookQueue.forEach(function(pb, i) {
+        var displayName = pb.replace('.yml', '').replace(/_/g, ' ');
+        html += '<div class="playbook-queue-item" id="queue-item-' + i + '">'
+            + '<span class="queue-num" id="queue-num-' + i + '">' + (i + 1) + '</span>'
+            + '<span class="queue-name">' + escHtml(displayName) + '</span>'
+            + '<span class="queue-status" id="queue-status-' + i + '"></span>'
+            + '<button class="queue-remove" onclick="removeFromQueue(' + i + ')" title="Remove">&times;</button>'
+            + '</div>';
+    });
+    container.innerHTML = html;
+    countEl.textContent = playbookQueue.length + ' playbook' + (playbookQueue.length > 1 ? 's' : '') + ' queued';
+}
+
+function colorizeOutput(text) {
+    if (/^(PLAY|TASK|PLAY RECAP)/.test(text)) return '<span class="task-header">' + escHtml(text) + '</span>';
+    if (/^ok:/.test(text)) return '<span class="task-ok">' + escHtml(text) + '</span>';
+    if (/^changed:/.test(text)) return '<span class="task-changed">' + escHtml(text) + '</span>';
+    if (/^(fatal|failed|ERROR)/.test(text)) return '<span class="task-failed">' + escHtml(text) + '</span>';
+    return escHtml(text);
+}
+
+function escHtml(t) {
+    return t.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+function updateQueueItemStatus(index, statusClass, statusText) {
+    var numEl = document.getElementById('queue-num-' + index);
+    var statusEl = document.getElementById('queue-status-' + index);
+    if (numEl) numEl.className = 'queue-num ' + statusClass;
+    if (statusEl) {
+        statusEl.textContent = statusText;
+        statusEl.style.color = statusClass === 'running' ? 'var(--panw-orange)'
+            : statusClass === 'done' ? 'var(--accent-teal)'
+            : statusClass === 'failed' ? 'var(--danger)' : '';
+    }
+    // Disable remove buttons while running
+    var removeBtn = document.querySelector('#queue-item-' + index + ' .queue-remove');
+    if (removeBtn) removeBtn.style.display = statusClass === 'running' ? 'none' : '';
+}
+
+function runPlaybook() {
+    if (playbookQueue.length === 0) { alert('Add at least one playbook to the queue.'); return; }
+
+    var clientId = document.getElementById('deploy-client-id').value.trim();
+    var clientSecret = document.getElementById('deploy-client-secret').value.trim();
+    var tsgId = document.getElementById('deploy-tsg-id').value.trim();
+    if (!clientId || !clientSecret || !tsgId) {
+        alert('All SCM credentials (Client ID, Client Secret, TSG ID) are required to deploy.');
+        return;
+    }
+
+    var wrapper = document.getElementById('terminal-wrapper');
+    var output = document.getElementById('terminal-output');
+    var status = document.getElementById('run-status');
+    var runBtn = document.getElementById('run-btn');
+    var stopBtn = document.getElementById('stop-btn');
+
+    wrapper.style.display = '';
+    output.innerHTML = '';
+    var queueLabel = playbookQueue.length === 1 ? playbookQueue[0] : playbookQueue.length + ' playbooks';
+    document.getElementById('terminal-title').textContent = '$ Running ' + queueLabel;
+    status.className = 'run-status running';
+    status.textContent = 'Running 1/' + playbookQueue.length;
+    runBtn.disabled = true;
+    stopBtn.style.display = '';
+
+    // Disable remove buttons on all queue items
+    document.querySelectorAll('.queue-remove').forEach(function(btn) { btn.style.display = 'none'; });
+
+    fetch('/run-playbook/' + currentSessionId, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+            playbooks: playbookQueue.slice(),
+            credentials: { client_id: clientId, client_secret: clientSecret, tsg_id: tsgId }
+        })
+    }).then(function(response) {
+        if (!response.ok) {
+            return response.json().then(function(data) {
+                throw new Error(data.error || 'Request failed');
+            });
+        }
+        var reader = response.body.getReader();
+        var decoder = new TextDecoder();
+        var buffer = '';
+
+        function processChunk(result) {
+            if (result.done) {
+                if (buffer.trim()) processSSEBuffer(buffer, output, status, runBtn, stopBtn);
+                if (status.textContent.indexOf('Running') === 0) {
+                    status.className = 'run-status success';
+                    status.textContent = 'Complete';
+                    runBtn.disabled = false;
+                    stopBtn.style.display = 'none';
+                }
+                return;
+            }
+            buffer += decoder.decode(result.value, {stream: true});
+            var parts = buffer.split('\n\n');
+            buffer = parts.pop();
+            parts.forEach(function(part) {
+                processSSEMessage(part.trim(), output, status, runBtn, stopBtn);
+            });
+            return reader.read().then(processChunk);
+        }
+
+        return reader.read().then(processChunk);
+    }).catch(function(err) {
+        output.innerHTML += '<span class="task-failed">Error: ' + escHtml(err.message) + '</span>\n';
+        status.className = 'run-status failed';
+        status.textContent = 'Failed';
+        runBtn.disabled = false;
+        stopBtn.style.display = 'none';
+        document.querySelectorAll('.queue-remove').forEach(function(btn) { btn.style.display = ''; });
+    });
+}
+
+function processSSEBuffer(buf, output, status, runBtn, stopBtn) {
+    buf.split('\n\n').forEach(function(part) {
+        if (part.trim()) processSSEMessage(part.trim(), output, status, runBtn, stopBtn);
+    });
+}
+
+function processSSEMessage(msg, output, status, runBtn, stopBtn) {
+    if (!msg) return;
+    var lines = msg.split('\n');
+    var eventType = 'message';
+    var dataStr = '';
+    lines.forEach(function(line) {
+        if (line.startsWith('event: ')) eventType = line.substring(7);
+        else if (line.startsWith('data: ')) dataStr = line.substring(6);
+    });
+
+    if (eventType === 'playbook_start') {
+        try {
+            var info = JSON.parse(dataStr);
+            var displayName = info.playbook.replace('.yml', '').replace(/_/g, ' ');
+            output.innerHTML += '\n<span class="task-header">━━━ [' + info.index + '/' + info.total + '] ' + displayName + ' ━━━</span>\n\n';
+            output.scrollTop = output.scrollHeight;
+            status.textContent = 'Running ' + info.index + '/' + info.total;
+            updateQueueItemStatus(info.index - 1, 'running', 'Running...');
+        } catch(e) {}
+    } else if (eventType === 'playbook_end') {
+        try {
+            var info = JSON.parse(dataStr);
+            if (info.exit_code === 0) {
+                updateQueueItemStatus(info.index - 1, 'done', 'Success');
+                output.innerHTML += '<span class="task-ok">Completed: ' + escHtml(info.playbook) + '</span>\n';
+            } else {
+                updateQueueItemStatus(info.index - 1, 'failed', 'Failed');
+                output.innerHTML += '<span class="task-failed">Failed: ' + escHtml(info.playbook) + ' (exit ' + info.exit_code + ')</span>\n';
+            }
+            output.scrollTop = output.scrollHeight;
+        } catch(e) {}
+    } else if (eventType === 'done') {
+        try {
+            var result = JSON.parse(dataStr);
+            var exitCode = result.exit_code;
+            if (exitCode === 0) {
+                status.className = 'run-status success';
+                status.textContent = 'All Completed';
+                output.innerHTML += '\n<span class="task-ok">All ' + playbookQueue.length + ' playbook(s) completed successfully</span>\n';
+            } else {
+                status.className = 'run-status failed';
+                var failMsg = result.stopped_at ? 'Failed at ' + result.stopped_at : 'Failed (exit ' + exitCode + ')';
+                status.textContent = failMsg;
+                output.innerHTML += '\n<span class="task-failed">' + escHtml(failMsg) + '</span>\n';
+            }
+        } catch(e) {
+            status.className = 'run-status failed';
+            status.textContent = 'Failed';
+        }
+        runBtn.disabled = false;
+        stopBtn.style.display = 'none';
+        document.querySelectorAll('.queue-remove').forEach(function(btn) { btn.style.display = ''; });
+    } else {
+        try {
+            var text = JSON.parse(dataStr);
+            output.innerHTML += colorizeOutput(text) + '\n';
+            output.scrollTop = output.scrollHeight;
+        } catch(e) {}
+    }
+}
+
+function stopPlaybook() {
+    if (!currentSessionId) return;
+    fetch('/stop-playbook/' + currentSessionId, { method: 'POST' })
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            var status = document.getElementById('run-status');
+            var output = document.getElementById('terminal-output');
+            status.className = 'run-status failed';
+            status.textContent = 'Stopped';
+            output.innerHTML += '\n<span class="task-failed">Playbook execution stopped by user</span>\n';
+            document.getElementById('run-btn').disabled = false;
+            document.getElementById('stop-btn').style.display = 'none';
+            document.querySelectorAll('.queue-remove').forEach(function(btn) { btn.style.display = ''; });
+        });
+}
+
+// ── Sizing Calculator ────────────────────────────────────────
+
+function initSizingDropdowns() {
+    var dropdowns = [
+        {select: 'sz-hub-bw', custom: 'sz-hub-bw-custom'},
+        {select: 'sz-branch-bw', custom: 'sz-branch-bw-custom'},
+        {select: 'sz-hub-sessions', custom: 'sz-hub-sessions-custom'},
+        {select: 'sz-branch-sessions', custom: 'sz-branch-sessions-custom'},
+    ];
+    dropdowns.forEach(function(d) {
+        var sel = document.getElementById(d.select);
+        var cust = document.getElementById(d.custom);
+        sel.onchange = function() {
+            if (sel.value === 'custom') {
+                cust.style.display = '';
+                cust.required = true;
+                cust.focus();
+            } else {
+                cust.style.display = 'none';
+                cust.required = false;
+                cust.value = '';
+            }
+        };
+    });
+}
+
+function getSizingValue(selectId, customId) {
+    var sel = document.getElementById(selectId);
+    if (sel.value === 'custom') {
+        return document.getElementById(customId).value;
+    }
+    return sel.value;
+}
+
+function submitSizing(e) {
+    e.preventDefault();
+    var spinner = document.getElementById('sizing-spinner');
+    var btn = document.getElementById('sizing-btn');
+    spinner.classList.add('active');
+    btn.disabled = true;
+    btn.textContent = 'Calculating...';
+
+    var formData = new FormData();
+    formData.append('num_hubs', document.getElementById('sz-num-hubs').value);
+    formData.append('num_branches', document.getElementById('sz-num-branches').value);
+    formData.append('hub_public_isps', document.getElementById('sz-hub-public').value);
+    formData.append('hub_private_isps', document.getElementById('sz-hub-private').value);
+    formData.append('branch_public_isps', document.getElementById('sz-branch-public').value);
+    formData.append('branch_private_isps', document.getElementById('sz-branch-private').value);
+    formData.append('hub_bandwidth_mbps', getSizingValue('sz-hub-bw', 'sz-hub-bw-custom'));
+    formData.append('branch_bandwidth_mbps', getSizingValue('sz-branch-bw', 'sz-branch-bw-custom'));
+    formData.append('hub_sessions', getSizingValue('sz-hub-sessions', 'sz-hub-sessions-custom'));
+    formData.append('branch_sessions', getSizingValue('sz-branch-sessions', 'sz-branch-sessions-custom'));
+    formData.append('threat_prevention', document.getElementById('sz-tp').checked ? 'yes' : 'no');
+    formData.append('ssl_decryption', document.getElementById('sz-ssl').checked ? 'yes' : 'no');
+    formData.append('url_filtering', document.getElementById('sz-url').checked ? 'yes' : 'no');
+    formData.append('wildfire', document.getElementById('sz-wf').checked ? 'yes' : 'no');
+    formData.append('dns_security', document.getElementById('sz-dns').checked ? 'yes' : 'no');
+    formData.append('hub_ha', document.getElementById('sz-hub-ha').checked ? 'yes' : 'no');
+    formData.append('branch_ha_count', document.getElementById('sz-branch-ha').value);
+    var platformRadio = document.querySelector('input[name="platform"]:checked');
+    formData.append('platform', platformRadio ? platformRadio.value : 'hardware');
+
+    fetch('/calculate-sizing', { method: 'POST', body: formData })
+        .then(function(resp) {
+            return resp.json().then(function(data) {
+                if (!resp.ok) throw new Error(data.error || 'Unknown error');
+                return data;
+            });
+        })
+        .then(function(data) {
+            spinner.classList.remove('active');
+            btn.disabled = false;
+            btn.textContent = 'Calculate Sizing';
+            showSizingDashboard(data.dashboard_html, data.excel_url);
+        })
+        .catch(function(err) {
+            spinner.classList.remove('active');
+            btn.disabled = false;
+            btn.textContent = 'Calculate Sizing';
+            var existing = document.querySelector('#sizing-form-section .alert');
+            if (existing) existing.remove();
+            var div = document.createElement('div');
+            div.className = 'alert alert-error';
+            div.textContent = 'Error: ' + err.message;
+            var container = document.getElementById('sizing-form-section');
+            var card = container.querySelector('.card');
+            container.insertBefore(div, card);
+        });
+}
+
+function showSizingDashboard(html, excelUrl) {
+    document.getElementById('sizing-form-section').style.display = 'none';
+    document.getElementById('main-footer').style.display = 'none';
+    document.getElementById('sizing-dashboard-content').innerHTML = html;
+    document.getElementById('sizing-excel-btn').href = excelUrl;
+    document.getElementById('sizing-results-section').style.display = '';
+    window.scrollTo(0, 0);
+}
 </script>
 
 </body>
