@@ -212,7 +212,8 @@ def calculate_sizing(inputs):
             dns_security: bool
             hub_ha: bool
             branch_ha_count: int
-            platform: str ('hardware' or 'virtual')
+            hub_platform: str ('hardware' or 'virtual')
+            branch_platform: str ('hardware' or 'virtual')
 
     Returns:
         dict with hub_recommendation, branch_recommendation, tunnel_calc,
@@ -230,7 +231,8 @@ def calculate_sizing(inputs):
     branch_sessions = inputs.get('branch_sessions', 50000)
     hub_ha = inputs.get('hub_ha', False)
     branch_ha_count = inputs.get('branch_ha_count', 0)
-    platform = inputs.get('platform', 'hardware')
+    hub_platform = inputs.get('hub_platform', 'hardware')
+    branch_platform = inputs.get('branch_platform', 'hardware')
 
     # Security features dict
     security_features = {
@@ -261,7 +263,7 @@ def calculate_sizing(inputs):
         num_tunnels=hub_tunnels,
         role='hub',
         security_features=security_features,
-        platform=platform,
+        platform=hub_platform,
     )
 
     # --- Branch sizing ---
@@ -271,7 +273,7 @@ def calculate_sizing(inputs):
         num_tunnels=branch_tunnels,
         role='branch',
         security_features=security_features,
-        platform=platform,
+        platform=branch_platform,
     )
 
     # --- Licensing ---
@@ -346,6 +348,7 @@ def calculate_sizing(inputs):
             'rationale': hub_rationale,
             'alternative': hub_alt,
             'device_count': hub_devices,
+            'platform': hub_platform,
             'inputs': {
                 'bandwidth_mbps': hub_bandwidth,
                 'tunnels': hub_tunnels,
@@ -363,6 +366,7 @@ def calculate_sizing(inputs):
             'rationale': branch_rationale,
             'alternative': branch_alt,
             'device_count': branch_devices,
+            'platform': branch_platform,
             'inputs': {
                 'bandwidth_mbps': branch_bandwidth,
                 'tunnels': branch_tunnels,
@@ -377,7 +381,6 @@ def calculate_sizing(inputs):
         'tunnel_calc': tunnel_calc,
         'licensing': licenses,
         'security_features': security_features,
-        'platform': platform,
         'summary': {
             'num_hubs': num_hubs,
             'num_branches': num_branches,
@@ -391,7 +394,8 @@ def calculate_sizing(inputs):
             'total_devices': total_devices,
             'hub_devices': hub_devices,
             'branch_devices': branch_devices,
-            'platform': platform,
+            'hub_platform': hub_platform,
+            'branch_platform': branch_platform,
         },
         'inputs': inputs,
     }

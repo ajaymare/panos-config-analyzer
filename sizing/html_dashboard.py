@@ -48,7 +48,7 @@ def _render_model_card(role, result, security_features):
     inputs = result['inputs']
     device_count = result['device_count']
     isps = result.get('isps', {})
-    platform = specs.get('platform', 'hardware')
+    platform = result.get('platform', 'hardware')
 
     role_color = '#fa582d' if role == 'Hub' else '#2e86c1'
     if platform == 'virtual':
@@ -304,9 +304,14 @@ def generate_sizing_dashboard(result):
     licenses = result['licensing']
     tunnel_calc = result['tunnel_calc']
     security_features = result.get('security_features', {})
-    platform = result.get('platform', 'hardware')
 
     html = '<div class="sizing-dashboard">'
+
+    # --- Per-role platform labels ---
+    hub_platform = result['hub'].get('platform', 'hardware')
+    branch_platform = result['branch'].get('platform', 'hardware')
+    hub_platform_label = 'VM-Series' if hub_platform == 'virtual' else 'Hardware'
+    branch_platform_label = 'VM-Series' if branch_platform == 'virtual' else 'Hardware'
 
     # --- Deployment Summary Banner ---
     ha_text = []
@@ -320,7 +325,10 @@ def generate_sizing_dashboard(result):
         ha_text.append(f'Branch: No')
     ha_display = ' | '.join(ha_text)
 
-    platform_label = 'VM-Series' if platform == 'virtual' else 'Hardware'
+    if hub_platform == branch_platform:
+        platform_display = hub_platform_label
+    else:
+        platform_display = f'Hub: {hub_platform_label} | Branch: {branch_platform_label}'
 
     # Count enabled security features
     sec_enabled = sum(1 for k in SECURITY_FEATURES if security_features.get(k))
@@ -349,7 +357,7 @@ def generate_sizing_dashboard(result):
             <span class="sizing-summary-label">Security Features</span>
         </div>
         <div class="sizing-summary-item">
-            <span class="sizing-summary-num sizing-summary-num-sm">{platform_label}</span>
+            <span class="sizing-summary-num sizing-summary-num-sm">{platform_display}</span>
             <span class="sizing-summary-label">Platform</span>
         </div>
     </div>
@@ -429,7 +437,7 @@ def generate_sizing_dashboard(result):
                 <tr>
                     <td>Hub</td>
                     <td><strong>{escape(hub["model"])}</strong></td>
-                    <td>{platform_label}</td>
+                    <td>{hub_platform_label}</td>
                     <td>{summary["num_hubs"]}</td>
                     <td>{hub_ha_label}</td>
                     <td>{hub["device_count"]}</td>
@@ -439,7 +447,7 @@ def generate_sizing_dashboard(result):
                 <tr>
                     <td>Branch</td>
                     <td><strong>{escape(branch["model"])}</strong></td>
-                    <td>{platform_label}</td>
+                    <td>{branch_platform_label}</td>
                     <td>{summary["num_branches"]}</td>
                     <td>{branch_ha_label}</td>
                     <td>{branch["device_count"]}</td>

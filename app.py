@@ -629,7 +629,8 @@ def sizing():
             'dns_security': request.form.get('dns_security') == 'yes',
             'hub_ha': request.form.get('hub_ha') == 'yes',
             'branch_ha_count': int(request.form.get('branch_ha_count', 0)),
-            'platform': request.form.get('platform', 'hardware'),
+            'hub_platform': request.form.get('hub_platform', 'hardware'),
+            'branch_platform': request.form.get('branch_platform', 'hardware'),
         }
 
         result = calculate_sizing(inputs)

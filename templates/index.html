@@ -279,14 +279,27 @@
                         <input type="number" name="num_branches" id="sz-num-branches" min="1" value="10" required>
                     </div>
                     <div class="form-group">
-                        <label>Platform</label>
+                        <label>Hub Platform</label>
                         <div class="sizing-platform-toggle">
                             <label class="platform-option">
-                                <input type="radio" name="platform" value="hardware" checked>
+                                <input type="radio" name="hub_platform" value="hardware" checked>
                                 <span class="platform-label">&#128187; Hardware</span>
                             </label>
                             <label class="platform-option">
-                                <input type="radio" name="platform" value="virtual">
+                                <input type="radio" name="hub_platform" value="virtual">
+                                <span class="platform-label">&#9729; VM-Series</span>
+                            </label>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label>Branch Platform</label>
+                        <div class="sizing-platform-toggle">
+                            <label class="platform-option">
+                                <input type="radio" name="branch_platform" value="hardware" checked>
+                                <span class="platform-label">&#128187; Hardware</span>
+                            </label>
+                            <label class="platform-option">
+                                <input type="radio" name="branch_platform" value="virtual">
                                 <span class="platform-label">&#9729; VM-Series</span>
                             </label>
                         </div>
@@ -1164,8 +1177,10 @@ function submitSizing(e) {
     formData.append('dns_security', document.getElementById('sz-dns').checked ? 'yes' : 'no');
     formData.append('hub_ha', document.getElementById('sz-hub-ha').checked ? 'yes' : 'no');
     formData.append('branch_ha_count', document.getElementById('sz-branch-ha').value);
-    var platformRadio = document.querySelector('input[name="platform"]:checked');
-    formData.append('platform', platformRadio ? platformRadio.value : 'hardware');
+    var hubPlatformRadio = document.querySelector('input[name="hub_platform"]:checked');
+    formData.append('hub_platform', hubPlatformRadio ? hubPlatformRadio.value : 'hardware');
+    var branchPlatformRadio = document.querySelector('input[name="branch_platform"]:checked');
+    formData.append('branch_platform', branchPlatformRadio ? branchPlatformRadio.value : 'hardware');
 
     fetch('/calculate-sizing', { method: 'POST', body: formData })
         .then(function(resp) {

@@ -79,7 +79,8 @@ def generate_sizing_report(result, output_dir):
     summary = result['summary']
     licenses = result['licensing']
     security_features = result.get('security_features', {})
-    platform = result.get('platform', 'hardware')
+    hub_platform = hub.get('platform', 'hardware')
+    branch_platform = branch.get('platform', 'hardware')
 
     # ========== Sheet 1: Sizing Recommendation ==========
     ws = wb.active
@@ -101,7 +102,8 @@ def generate_sizing_report(result, output_dir):
     row += 2
 
     # KPI Row
-    platform_label = 'VM-Series' if platform == 'virtual' else 'Hardware'
+    hub_platform_label = 'VM-Series' if hub_platform == 'virtual' else 'Hardware'
+    branch_platform_label = 'VM-Series' if branch_platform == 'virtual' else 'Hardware'
     style_kpi_cell(ws, row, 1, 'Hub Model', hub['model'])
     style_kpi_cell(ws, row, 3, 'Branch Model', branch['model'])
     style_kpi_cell(ws, row, 5, 'Total Devices', summary['total_devices'])
@@ -109,7 +111,7 @@ def generate_sizing_report(result, output_dir):
 
     style_kpi_cell(ws, row, 1, 'Hub Sites', summary['num_hubs'])
     style_kpi_cell(ws, row, 3, 'Branch Sites', summary['num_branches'])
-    style_kpi_cell(ws, row, 5, 'Platform', platform_label)
+    style_kpi_cell(ws, row, 5, 'Hub Platform', hub_platform_label)
     row += 3
 
     hub_ha_label = 'Yes' if summary.get('hub_ha') else 'No'
@@ -117,7 +119,7 @@ def generate_sizing_report(result, output_dir):
     branch_ha_label = f'{branch_ha_count} of {summary["num_branches"]}' if branch_ha_count > 0 else 'No'
     style_kpi_cell(ws, row, 1, 'Hub HA', hub_ha_label)
     style_kpi_cell(ws, row, 3, 'Branch HA', branch_ha_label)
-    style_kpi_cell(ws, row, 5, '', '')
+    style_kpi_cell(ws, row, 5, 'Branch Platform', branch_platform_label)
     row += 3
 
     # --- Security Features ---
@@ -138,7 +140,7 @@ def generate_sizing_report(result, output_dir):
     hub_specs = [
         ['Model', hub['model']],
         ['Series', hub['specs'].get('series', '')],
-        ['Platform', platform_label],
+        ['Platform', hub_platform_label],
         ['Description', hub['specs'].get('description', '')],
         ['Firewall Throughput', f'{_fmt(hub["specs"]["firewall_throughput"])} Mbps'],
         ['Threat Prevention Throughput', f'{_fmt(hub["specs"]["threat_throughput"])} Mbps'],
@@ -170,7 +172,7 @@ def generate_sizing_report(result, output_dir):
     branch_specs = [
         ['Model', branch['model']],
         ['Series', branch['specs'].get('series', '')],
-        ['Platform', platform_label],
+        ['Platform', branch_platform_label],
         ['Description', branch['specs'].get('description', '')],
         ['Firewall Throughput', f'{_fmt(branch["specs"]["firewall_throughput"])} Mbps'],
         ['Threat Prevention Throughput', f'{_fmt(branch["specs"]["threat_throughput"])} Mbps'],
@@ -244,19 +246,22 @@ def generate_sizing_report(result, output_dir):
     bha = summary.get('branch_ha_count', 0)
     branch_ha_str = f'{bha} sites' if bha > 0 else 'No'
     bom_rows = [
-        ['Hub', hub['model'], platform_label, summary['num_hubs'], hub_ha_str, hub['device_count']],
-        ['Branch', branch['model'], platform_label, summary['num_branches'], branch_ha_str, branch['device_count']],
+        ['Hub', hub['model'], hub_platform_label, summary['num_hubs'], hub_ha_str, hub['device_count']],
+        ['Branch', branch['model'], branch_platform_label, summary['num_branches'], branch_ha_str, branch['device_count']],
         ['Total', '', '', '', '', summary['total_devices']],
     ]
     row = _write_table(ws, row, ['Role', 'Model', 'Platform', 'Sites', 'HA', 'Devices'], bom_rows)
 
     auto_width(ws)
 
-    # ========== Sheet 2: Model Comparison ==========
-    models = VM_MODELS if platform == 'virtual' else PA_MODELS
-    sheet_title = 'VM-Series Comparison' if platform == 'virtual' else 'Hardware Model Comparison'
+    # ========== Sheet 2+: Model Comparison ==========
+    # Determine which catalogs to show
+    catalogs = []
+    if hub_platform == 'hardware' or branch_platform == 'hardware':
+        catalogs.append(('Hardware Model Comparison', PA_MODELS))
+    if hub_platform == 'virtual' or branch_platform == 'virtual':
+        catalogs.append(('VM-Series Comparison', VM_MODELS))
 
-    ws2 = wb.create_sheet(sheet_title)
     headers = [
         'Model', 'Series', 'FW Throughput (Mbps)', 'TP Throughput (Mbps)',
         'SSL Decrypt (Mbps)', 'IPSec Throughput (Mbps)', 'Max Sessions',
@@ -264,61 +269,64 @@ def generate_sizing_report(result, output_dir):
         'Ports', 'Role', 'Description',
     ]
 
-    # Title
-    cell = ws2.cell(row=1, column=1, value=f'{sheet_title}')
-    cell.font = Font(name='Calibri', size=14, bold=True, color=BLUE)
-    ws2.merge_cells(start_row=1, start_column=1, end_row=1, end_column=len(headers))
+    for sheet_title, models in catalogs:
+        ws2 = wb.create_sheet(sheet_title)
 
-    cell = ws2.cell(row=2, column=1,
-                    value=f'Hub recommendation: {hub["model"]}  |  Branch recommendation: {branch["model"]}')
-    cell.font = subtitle_font
-    ws2.merge_cells(start_row=2, start_column=1, end_row=2, end_column=len(headers))
+        # Title
+        cell = ws2.cell(row=1, column=1, value=f'{sheet_title}')
+        cell.font = Font(name='Calibri', size=14, bold=True, color=BLUE)
+        ws2.merge_cells(start_row=1, start_column=1, end_row=1, end_column=len(headers))
 
-    model_rows = []
-    for model_name, specs in models.items():
-        model_rows.append([
-            model_name,
-            specs.get('series', ''),
-            specs['firewall_throughput'],
-            specs['threat_throughput'],
-            specs.get('ssl_decrypt_throughput', 0),
-            specs['ipsec_vpn_throughput'],
-            specs['max_sessions'],
-            specs['new_sessions_per_sec'],
-            specs['max_ipsec_tunnels'],
-            specs['max_security_rules'],
-            specs.get('form_factor', ''),
-            specs.get('ports', ''),
-            specs.get('recommended_role', '').title(),
-            specs.get('description', ''),
-        ])
+        cell = ws2.cell(row=2, column=1,
+                        value=f'Hub recommendation: {hub["model"]}  |  Branch recommendation: {branch["model"]}')
+        cell.font = subtitle_font
+        ws2.merge_cells(start_row=2, start_column=1, end_row=2, end_column=len(headers))
 
-    start = 4
-    for ci, h in enumerate(headers, 1):
-        cell = ws2.cell(row=start, column=ci, value=h)
-        cell.font = header_font
-        cell.fill = header_fill
-        cell.alignment = header_align
-        cell.border = thin_border
+        model_rows = []
+        for model_name, specs in models.items():
+            model_rows.append([
+                model_name,
+                specs.get('series', ''),
+                specs['firewall_throughput'],
+                specs['threat_throughput'],
+                specs.get('ssl_decrypt_throughput', 0),
+                specs['ipsec_vpn_throughput'],
+                specs['max_sessions'],
+                specs['new_sessions_per_sec'],
+                specs['max_ipsec_tunnels'],
+                specs['max_security_rules'],
+                specs.get('form_factor', ''),
+                specs.get('ports', ''),
+                specs.get('recommended_role', '').title(),
+                specs.get('description', ''),
+            ])
 
-    for ri, row_data in enumerate(model_rows):
-        r = start + 1 + ri
-        model_name = row_data[0]
-        is_hub = model_name == hub['model']
-        is_branch = model_name == branch['model']
-        for ci, val in enumerate(row_data, 1):
-            cell = ws2.cell(row=r, column=ci, value=val)
+        start = 4
+        for ci, h in enumerate(headers, 1):
+            cell = ws2.cell(row=start, column=ci, value=h)
+            cell.font = header_font
+            cell.fill = header_fill
+            cell.alignment = header_align
             cell.border = thin_border
-            cell.alignment = data_align
-            if is_hub or is_branch:
-                cell.fill = highlight_fill
-                cell.font = highlight_font
-            else:
-                cell.font = data_font
-                if ri % 2 == 1:
-                    cell.fill = alt_fill
 
-    auto_width(ws2, max_width=40)
+        for ri, row_data in enumerate(model_rows):
+            r = start + 1 + ri
+            model_name = row_data[0]
+            is_hub = model_name == hub['model']
+            is_branch = model_name == branch['model']
+            for ci, val in enumerate(row_data, 1):
+                cell = ws2.cell(row=r, column=ci, value=val)
+                cell.border = thin_border
+                cell.alignment = data_align
+                if is_hub or is_branch:
+                    cell.fill = highlight_fill
+                    cell.font = highlight_font
+                else:
+                    cell.font = data_font
+                    if ri % 2 == 1:
+                        cell.fill = alt_fill
+
+        auto_width(ws2, max_width=40)
 
     # Save
     filename = f'Sizing_Recommendation_{datetime.now().strftime("%Y%m%d_%H%M%S")}.xlsx'
