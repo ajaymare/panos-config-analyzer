@@ -764,6 +764,13 @@ body {
     background: rgba(250,88,45,0.06);
 }
 .platform-label:hover { border-color: #aaa; }
+.sizing-vm-hint {
+    display: block; font-size: 11px; color: var(--text-secondary); margin-top: 4px;
+}
+.sizing-platform-section {
+    background: rgba(250,88,45,0.03); border: 1px solid rgba(250,88,45,0.15);
+    border-radius: 10px; padding: 16px 20px; margin-top: 8px; margin-bottom: 8px;
+}
 
 /* Security features grid in form */
 .sizing-security-grid {
