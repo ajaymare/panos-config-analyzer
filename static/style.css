@@ -764,8 +764,11 @@ body {
     background: rgba(250,88,45,0.06);
 }
 .platform-label:hover { border-color: #aaa; }
+.sizing-vm-toggle-row {
+    display: flex; align-items: center; gap: 10px; cursor: pointer; margin-top: 4px;
+}
 .sizing-vm-hint {
-    display: block; font-size: 11px; color: var(--text-secondary); margin-top: 4px;
+    font-size: 11px; color: var(--text-secondary);
 }
 .sizing-platform-section {
     background: rgba(250,88,45,0.03); border: 1px solid rgba(250,88,45,0.15);
