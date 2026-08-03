@@ -1,22 +1,56 @@
-# PAN-OS SD-WAN Configuration Parser
+# PAN-OS SD-WAN Toolkit
 
-Docker-based tool with a Flask web UI that parses Palo Alto Panorama/NGFW configurations and generates Excel + HTML dashboard reports of all SD-WAN features — with deployment maturity scoring, gap analysis, and side-by-side comparison. Designed for SEs, PMs, and network engineers.
+Docker-based web application for Palo Alto Networks SD-WAN professionals. Three integrated tools: Configuration Analysis with deployment scoring, SCM Migration with Ansible playbook generation, and Firewall Sizing Calculator with hardware and VM-Series recommendations.
 
-## Features
+## Three Modes
 
-- **Multi-Config Comparison**: Upload multiple Panorama and NGFW configs to compare features side-by-side
-- **Single Config Analysis**: Upload one XML file for detailed analysis
-- **Panorama + NGFW**: Automatically detects config type, enumerates templates, template-stacks, and device-groups
-- **Panorama-Managed NGFW Detection**: Detects Panorama-managed NGFWs and correlates SD-WAN features from Panorama config
-- **Inline Dashboard**: HTML dashboard renders directly in the web UI after parsing — no separate file download
-- **38 SD-WAN Features Tracked**: Comprehensive extraction across 23 parsers covering 7 categories
-- **Software Version Detection**: Extracts PAN-OS version and SD-WAN plugin version from configs
-- **Deployment Scoring**: Automatic maturity grading based on enabled features (Basic: 0-13, Advanced: 14-26, Full: 27-38)
-- **Excel Reports**: Executive Summary with scoring, device-level feature details + Quick Reference + detailed per-feature sheets + comparison views
-- **Sensitive Data Masking**: Selectively mask IPs, hostnames, device names, passwords, certificates, and network addresses
-- **Multi-User Support**: Per-session isolation — multiple users can parse configs simultaneously
-- **HTTPS Support**: Self-signed certificate with nginx reverse proxy on port 9443
-- **Dockerized**: Single container, no external dependencies
+### 1. Configuration Analysis
+Upload Panorama or NGFW XML configs to generate deployment reports with maturity scoring, gap analysis, and multi-config comparison.
+
+- **38 SD-WAN features tracked** across 7 categories (23 parsers)
+- Deployment scoring: Basic (0-13), Advanced (14-26), Full (27-38)
+- Inline HTML dashboard + downloadable Excel report
+- Multi-config side-by-side comparison
+- Panorama-managed NGFW detection and correlation
+- PAN-OS and SD-WAN plugin version extraction
+- Sensitive data masking (IPs, hostnames, devices, passwords, certs, networks)
+
+### 2. SCM Migration
+Convert PAN-OS SD-WAN configurations to SCM-compatible Ansible playbooks for automated migration to Strata Cloud Manager.
+
+- Migration readiness analysis with feature-by-feature compatibility
+- Ansible playbook generation (configure + delete) for 15 SD-WAN object types
+- Direct deploy-to-SCM from the web UI with playbook queue and live terminal output
+- Migration report with supported/unsupported feature breakdown
+
+### 3. Sizing Calculator
+Input site requirements and get PA firewall model recommendations for SD-WAN deployments.
+
+- **Hardware**: 17 PA models (PA-440 through PA-7080)
+- **VM-Series**: 7 VM models (VM-50 through VM-1000-HV)
+- **Security features** that affect sizing: Threat Prevention, SSL Decryption, URL Filtering, WildFire, DNS Security
+- Separate Hub and Branch recommendations with role-aware model selection
+- ISP-based tunnel calculation (Private: 1-to-1, Public: 1-to-many)
+- 30% minimum headroom enforcement on all sizing requirements
+- TAC recommended PAN-OS version per model series
+- Licensing recommendations (auto-suggests BPLA bundle for 3+ security features)
+- Full device specs: throughput, sessions, tunnels, ports, form factor, HA support
+- Downloadable Excel report with model comparison sheet
+
+## Quick Start
+
+```bash
+docker run -d --name panos-sdwan-toolkit -p 8080:8080 -p 9443:9443 ajaymare/panos-sdwan-toolkit:latest
+```
+
+Open `https://localhost:9443` (HTTPS) or `http://localhost:8080` (HTTP).
+
+### Build from Source
+
+```bash
+docker build -t ajaymare/panos-sdwan-toolkit:latest .
+docker run -d --name panos-sdwan-toolkit -p 8080:8080 -p 9443:9443 ajaymare/panos-sdwan-toolkit:latest
+```
 
 ## 38 Tracked SD-WAN Features (7 Categories)
 
@@ -30,120 +64,112 @@ Docker-based tool with a Flask web UI that parses Palo Alto Panorama/NGFW config
 | **Monitoring & Reporting** | ADEM Integration, SD-WAN Reporting, Log Collection, Device Telemetry, Monitor Profiles |
 | **Network Infrastructure** | Sub/Agg Interfaces, Custom Applications, Template/Stack Mapping, Upstream NAT, ZTP Support |
 
-## Quick Start
+## Sizing Calculator Details
 
-### Docker Run
+### Supported PA Hardware Models
 
-```bash
-docker run -d --name panos-parser -p 8080:8080 -p 9443:9443 ajaymare/panos-config-analyzer:latest
-```
+| Series | Models | Role |
+|--------|--------|------|
+| PA-400 | PA-440, PA-450, PA-460 | Branch |
+| PA-800 | PA-820, PA-850 | Branch |
+| PA-1400 | PA-1420, PA-1430 | Branch / Hub |
+| PA-3400 | PA-3410, PA-3420, PA-3430, PA-3440 | Hub |
+| PA-5400 | PA-5410, PA-5420, PA-5430, PA-5440 | Hub |
+| PA-7000 | PA-7050, PA-7080 | Hub |
 
-Open `http://localhost:8080` (HTTP) or `https://localhost:9443` (HTTPS) in your browser.
+### Supported VM-Series Models
 
-### Docker Build
+| Model | vCPU | Role |
+|-------|------|------|
+| VM-50 | 2 | Branch (lab/micro-branch) |
+| VM-100 | 2 | Branch |
+| VM-200 | 2 | Branch |
+| VM-300 | 4 | Branch / Hub |
+| VM-500 | 8 | Branch / Hub |
+| VM-700 | 16 | Hub |
+| VM-1000-HV | 16+ | Hub |
 
-```bash
-docker build -t ajaymare/panos-config-analyzer:latest .
-docker run -d --name panos-parser -p 8080:8080 -p 9443:9443 ajaymare/panos-config-analyzer:latest
-```
+### Security Features and Throughput Impact
+
+| Feature | Impact | Throughput Metric Used |
+|---------|--------|----------------------|
+| Threat Prevention | High | Threat Prevention throughput |
+| SSL Decryption | High | SSL Decryption throughput (lowest) |
+| URL Filtering | Medium | Licensing only |
+| WildFire | Medium | Licensing only |
+| DNS Security | Low | Licensing only |
+
+### Tunnel Calculation Logic
+
+- **Private ISP** (MPLS/P2P): 1-to-1 tunnels per matching hub link
+- **Public ISP** (Internet): 1-to-many tunnels to every hub public link on every hub
+- No branch-to-branch tunnels
 
 ## Usage
 
-### Single Config Analysis
+### Configuration Analysis
 
-1. Export running config from Panorama or NGFW:
-   - **GUI**: Device → Setup → Operations → Export named configuration snapshot
-   - **CLI**: `show config running` → save to XML
-2. Open `http://localhost:8080`
-3. Select one XML file → click "Generate Report"
-4. Dashboard displays inline with scorecards, feature summary, and gap analysis
-5. Click "Download Excel Report" for the detailed Excel file
+1. Export running config: Device > Setup > Operations > Export named configuration snapshot (or CLI: `show config running`)
+2. Select "Generate Report" on the landing page
+3. Upload one or multiple XML files
+4. Dashboard displays inline; click "Download Excel Report" for details
 
-### Multi-Config Comparison
+### SCM Migration
 
-1. Export configs from multiple devices (Panorama + NGFWs)
-2. Open `http://localhost:8080`
-3. Select multiple XML files → click "Compare N Configurations"
-4. Comparison dashboard displays inline with side-by-side scoring and feature comparison
-5. Click "Download Excel Report" for the detailed comparison Excel
-6. Use the X button to remove individual files before submitting
+1. Select "Generate SCM Config" on the landing page
+2. Upload Panorama XML config
+3. Select SD-WAN objects to migrate
+4. Review migration dashboard, download Ansible playbooks, or deploy directly to SCM
 
-### Panorama-Managed NGFW Configs
+### Sizing Calculator
 
-NGFW configs exported from Panorama-managed devices don't contain SD-WAN configuration locally — it's pushed from Panorama. The tool handles this automatically:
-
-- **NGFW uploaded alone**: SD-WAN features show as "Panorama-Managed" (amber) instead of "Not configured" (red)
-- **NGFW + Panorama uploaded together**: SD-WAN features from Panorama are correlated and attributed to each NGFW device, giving a complete picture
-
-### Mask Sensitive Information
-
-Before parsing, optionally enable masking to redact sensitive data from the report:
-- **IP Addresses** — All IPs replaced with `x.x.x.x`
-- **Hostnames & FQDNs** — DNS names replaced with `***.***`
-- **Device Names & Serials** — Consistently replaced with `DEVICE-001`, `DEVICE-002`, etc.
-- **Passwords & Keys** — Pre-shared keys, API keys replaced with `********`
-- **Certificates** — CA certificate names redacted
-- **Network Addresses** — Subnets, BGP AS numbers, interface names masked
-
-Use "Select All" to enable all categories, or pick individual ones.
-
-## Report Output
-
-The inline dashboard displays immediately after parsing. The Excel report is available via download button.
-
-### Inline Dashboard
-- **Deployment Scorecards**: Per-config cards with maturity level (Basic/Advanced/Full), circular progress, device name, PAN-OS and SD-WAN plugin versions
-- **Feature Comparison Table**: All 38 features grouped by 7 categories — green checkmark (enabled), amber diamond (Panorama-Managed), red X (missing). Topology Configured shows actual type (Full Mesh / Hub-Spoke)
-- **Category Bar Charts**: Horizontal bars showing coverage percentage per category per config
-- **Gap Analysis**: Missing features with actionable recommendations for each config
-
-### Excel Report
-
-#### Single Config
-- **Executive Summary**: KPI scorecard (maturity level, score, enabled/gaps), device name with serial, category coverage with progress bars, compact feature status by category, prioritized recommendations with business impact
-- **Quick Reference**: All 38 features grouped by 7 categories with one row per device/source per feature
-- **Detail Sheets**: One sheet per feature with full configuration data
-- **All Features**: Split into Enabled and Disabled sections with counts
-
-#### Multi-Config Comparison
-- **Executive Summary**: Side-by-side deployment scoring across all configs
-- **Comparison Summary**: Features as rows, per-config Status + Summary columns
-- **Detail Sheets**: Merged data from all configs per feature
-- **All Features**: Enabled/Disabled split across all configs
+1. Select "Sizing Calculator" on the landing page
+2. Choose platform (Hardware or VM-Series)
+3. Enter deployment details: hub/branch count, bandwidth, sessions, ISP links
+4. Toggle security features (Threat Prevention, SSL Decryption, etc.)
+5. Configure HA requirements
+6. Click "Calculate Sizing" for recommendations with rationale
 
 ## Project Structure
 
 ```
 parser/
-├── app.py                  # Flask routes (single + multi-file)
-├── config.py               # App configuration
-├── requirements.txt        # Python dependencies
+├── app.py                     # Flask routes
+├── config.py                  # App configuration
 ├── Dockerfile
-├── nginx.conf              # HTTPS reverse proxy config (port 9443)
-├── start.sh                # Entrypoint: generates self-signed cert, starts gunicorn + nginx
-├── parsers/                # Feature extraction modules
-│   ├── base.py             # BaseParser ABC + FeatureResult
-│   ├── config_detector.py  # Panorama vs NGFW detection
-│   ├── registry.py         # Auto-discovers all parsers
-│   └── *.py                # 23 feature parsers (38 tracked features)
-├── api_client/
-│   └── connector.py        # pan-os-python SDK wrapper
+├── nginx.conf                 # HTTPS reverse proxy (port 9443)
+├── start.sh                   # Entrypoint script
+├── parsers/                   # 23 feature extraction modules
+│   ├── base.py                # BaseParser ABC + FeatureResult
+│   ├── config_detector.py     # Panorama vs NGFW detection
+│   ├── registry.py            # Auto-discovers all parsers
+│   └── *.py                   # Feature parsers
 ├── report/
-│   ├── excel_generator.py  # Single + comparison report generation
-│   ├── html_dashboard.py   # Self-contained HTML dashboard generator
-│   ├── scorer.py           # Deployment maturity scoring engine
-│   ├── masker.py           # Sensitive data masking engine
-│   └── styles.py           # Cell formatting
+│   ├── excel_generator.py     # Single + comparison reports
+│   ├── html_dashboard.py      # Inline HTML dashboard
+│   ├── migration_dashboard.py # SCM migration dashboard
+│   ├── scorer.py              # Deployment maturity scoring
+│   ├── masker.py              # Sensitive data masking
+│   └── styles.py              # Excel cell formatting
+├── scm/
+│   ├── mapper.py              # PAN-OS to SCM config mapping
+│   ├── ansible_generator.py   # Ansible playbook generation
+│   └── migration_report.py    # Migration report generation
+├── sizing/
+│   ├── models.py              # PA + VM-Series specs, licensing data
+│   ├── calculator.py          # Sizing algorithm
+│   ├── html_dashboard.py      # Sizing dashboard HTML
+│   └── excel_report.py        # Sizing Excel report
 ├── templates/
-│   └── index.html          # Web UI with multi-file upload
+│   └── index.html             # Web UI
 └── static/
     └── style.css
 ```
 
 ## Dependencies
 
-- Flask — Web framework
-- openpyxl — Excel generation
-- lxml — XML parsing
-- gunicorn — Production WSGI server
-- nginx — HTTPS reverse proxy with self-signed certificate
+- Flask, gunicorn -- Web framework and WSGI server
+- openpyxl -- Excel report generation
+- lxml -- XML parsing
+- PyYAML -- Ansible playbook generation
+- nginx -- HTTPS reverse proxy with self-signed certificate
