@@ -23,9 +23,23 @@ from scm.migration_report import generate_migration_report
 from sizing.calculator import calculate_sizing
 from sizing.html_dashboard import generate_sizing_dashboard
 from sizing.excel_report import generate_sizing_report
+from sizing.rag.retrieval import get_docs_for_sizing_result
+from sizing.rag.refresh import auto_refresh_if_stale, refresh_datasheets, get_status as rag_status
 
 app = Flask(__name__)
 app.config['MAX_CONTENT_LENGTH'] = app_config.MAX_CONTENT_LENGTH
+
+# Auto-refresh PA datasheets in background on startup (non-blocking)
+import threading
+def _background_rag_init():
+    import logging
+    logger = logging.getLogger(__name__)
+    try:
+        auto_refresh_if_stale(max_age_days=30)
+    except Exception as e:
+        logger.warning("Background RAG init failed (non-fatal): %s", e)
+
+threading.Thread(target=_background_rag_init, daemon=True).start()
 
 # In-memory session cache for parsed results (for Ansible generation)
 # Key: session_id, Value: {'configs_data': [...], 'timestamp': float}
@@ -605,6 +619,25 @@ def stop_playbook(session_id):
     return jsonify({'stopped': False, 'message': 'No running playbook'})
 
 
+@app.route('/refresh-datasheets', methods=['POST'])
+def refresh_docs():
+    """Manually trigger re-fetch of all PA datasheets."""
+    try:
+        result = refresh_datasheets()
+        return jsonify(result)
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/datasheet-status')
+def datasheet_status():
+    """Return current datasheet ingestion status."""
+    try:
+        return jsonify(rag_status())
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
 @app.route('/calculate-sizing', methods=['POST'])
 def sizing():
     """Calculate PA firewall sizing recommendation for SD-WAN deployment."""
@@ -633,6 +666,11 @@ def sizing():
         }
 
         result = calculate_sizing(inputs)
+
+        # Retrieve relevant datasheet snippets for recommended models
+        doc_refs = get_docs_for_sizing_result(result)
+        result['doc_references'] = doc_refs
+
         dashboard_html = generate_sizing_dashboard(result)
         excel_path = generate_sizing_report(result, output_dir=session_dir)
         excel_filename = os.path.basename(excel_path)

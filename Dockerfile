@@ -11,7 +11,7 @@ RUN pip install --no-cache-dir -r requirements.txt ansible-core>=2.16
 
 COPY . .
 
-RUN mkdir -p /tmp/reports
+RUN mkdir -p /tmp/reports /app/rag_data/pdfs /app/rag_data/chroma
 
 COPY nginx.conf /etc/nginx/conf.d/default.conf
 COPY start.sh /start.sh

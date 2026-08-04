@@ -860,3 +860,28 @@ body {
 .sizing-impact-high { background: rgba(250,88,45,0.12); color: var(--panw-orange); }
 .sizing-impact-medium { background: rgba(255,203,5,0.2); color: #b8860b; }
 .sizing-impact-low { background: rgba(40,167,69,0.12); color: #28a745; }
+
+/* Documentation References */
+.sizing-doc-refs {
+    background: #fff; border-radius: 10px; padding: 20px; margin-top: 16px;
+    border: 1px solid #e0e0e0;
+}
+.sizing-doc-refs h3 { font-size: 15px; color: var(--panw-navy); margin: 0 0 4px 0; }
+.sizing-doc-refs-desc { font-size: 11px; color: var(--text-secondary); margin: 0 0 16px 0; }
+.sizing-doc-role { margin-bottom: 16px; }
+.sizing-doc-role h4 { font-size: 13px; color: #2e86c1; margin: 0 0 8px 0; border-bottom: 1px solid #eee; padding-bottom: 4px; }
+.sizing-doc-snippet {
+    background: #f8f9fa; border-radius: 6px; padding: 10px 12px; margin-bottom: 8px;
+    border-left: 3px solid #ccc; font-size: 12px;
+}
+.sizing-doc-high { border-left-color: #28a745; }
+.sizing-doc-medium { border-left-color: #f0ad4e; }
+.sizing-doc-low { border-left-color: #ccc; }
+.sizing-doc-source {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: 6px; font-size: 10px; color: var(--text-secondary);
+}
+.sizing-doc-file { font-weight: 600; }
+.sizing-doc-link { color: #2e86c1; text-decoration: none; font-weight: 600; }
+.sizing-doc-link:hover { text-decoration: underline; }
+.sizing-doc-text { color: var(--text-primary); line-height: 1.5; white-space: pre-wrap; word-break: break-word; }

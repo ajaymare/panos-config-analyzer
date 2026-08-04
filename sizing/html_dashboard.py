@@ -296,6 +296,58 @@ def _render_security_features(security_features):
     return html
 
 
+def _render_doc_references(doc_refs):
+    """Render the Official Documentation panel with datasheet excerpts."""
+    if not doc_refs:
+        return ''
+
+    html = '''
+    <div class="sizing-doc-refs">
+        <h3>Official Documentation References</h3>
+        <p class="sizing-doc-refs-desc">Relevant excerpts from Palo Alto Networks datasheets, auto-retrieved for recommended models.</p>
+    '''
+
+    role_labels = {'hub': 'Hub', 'branch': 'Branch', 'hub_virtual': 'Hub (VM-Series)'}
+
+    for role_key, docs in doc_refs.items():
+        role_label = role_labels.get(role_key, role_key.title())
+        html += f'''
+        <div class="sizing-doc-role">
+            <h4>{escape(role_label)} Model Documentation</h4>
+        '''
+        for doc in docs:
+            source = doc.get('source_file', 'Unknown source')
+            page = doc.get('page', '')
+            source_url = doc.get('source_url', '')
+            text = doc.get('text', '')
+            score = doc.get('score', 0)
+
+            page_label = f' (Page {page})' if page else ''
+            link_html = ''
+            if source_url:
+                link_html = f' <a href="{escape(source_url)}" target="_blank" class="sizing-doc-link">View source &#8599;</a>'
+
+            # Truncate long text
+            if len(text) > 500:
+                text = text[:500] + '...'
+
+            relevance_class = 'sizing-doc-high' if score > 0.5 else 'sizing-doc-medium' if score > 0.3 else 'sizing-doc-low'
+
+            html += f'''
+            <div class="sizing-doc-snippet {relevance_class}">
+                <div class="sizing-doc-source">
+                    <span class="sizing-doc-file">{escape(source)}{page_label}</span>
+                    {link_html}
+                </div>
+                <div class="sizing-doc-text">{escape(text)}</div>
+            </div>
+            '''
+        html += '</div>'
+
+    html += '</div>'
+    return html
+
+
 def generate_sizing_dashboard(result):
     """Generate the full sizing dashboard HTML fragment."""
     summary = result['summary']
@@ -304,6 +356,7 @@ def generate_sizing_dashboard(result):
     licenses = result['licensing']
     tunnel_calc = result['tunnel_calc']
     security_features = result.get('security_features', {})
+    doc_refs = result.get('doc_references', {})
 
     hub_virtual = result.get('hub_virtual')
     vm_series = result.get('vm_series', False)
@@ -367,6 +420,10 @@ def generate_sizing_dashboard(result):
         html += _render_model_card('Hub', hub_virtual, security_features)
     html += _render_model_card('Branch', branch, security_features)
     html += '</div>'
+
+    # --- Official Documentation References ---
+    if doc_refs:
+        html += _render_doc_references(doc_refs)
 
     # --- Tunnel Calculation Breakdown ---
     html += _render_tunnel_breakdown(tunnel_calc, summary)

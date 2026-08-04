@@ -466,6 +466,20 @@
         </div>
     </div>
 
+    <!-- Documentation Status -->
+    <div class="card" style="margin-top: 12px;" id="doc-status-card">
+        <div style="padding: 12px 20px; display: flex; align-items: center; justify-content: space-between;">
+            <div style="display: flex; align-items: center; gap: 10px;">
+                <span style="font-size: 16px;">&#128218;</span>
+                <div>
+                    <strong style="font-size: 13px;">Datasheet References</strong>
+                    <div id="doc-status-text" style="font-size: 12px; color: var(--text-secondary);">Checking status...</div>
+                </div>
+            </div>
+            <button class="btn btn-secondary" style="width: auto; padding: 4px 12px; font-size: 12px;" onclick="refreshDatasheets()" id="refresh-docs-btn">Refresh Docs</button>
+        </div>
+    </div>
+
     <div class="spinner" id="sizing-spinner">
         <p style="margin-top: 12px; font-size: 13px; color: var(--text-secondary);">
             Calculating optimal firewall sizing...
@@ -504,6 +518,7 @@ function selectMode(mode) {
     if (mode === 'sizing') {
         document.getElementById('sizing-form-section').style.display = '';
         initSizingDropdowns();
+        checkDocStatus();
         return;
     }
 
@@ -1188,6 +1203,48 @@ function submitSizing(e) {
             var container = document.getElementById('sizing-form-section');
             var card = container.querySelector('.card');
             container.insertBefore(div, card);
+        });
+}
+
+function checkDocStatus() {
+    fetch('/datasheet-status')
+        .then(function(resp) { return resp.json(); })
+        .then(function(data) {
+            var text = document.getElementById('doc-status-text');
+            if (data.initialized && data.total_chunks > 0) {
+                var lastRefresh = data.last_refresh ? new Date(data.last_refresh).toLocaleDateString() : 'Unknown';
+                text.innerHTML = '<span style="color: #28a745;">&#9679;</span> ' +
+                    data.downloaded_files + ' datasheets indexed (' + data.total_chunks + ' chunks) &mdash; Last refresh: ' + lastRefresh;
+            } else {
+                text.innerHTML = '<span style="color: #f0ad4e;">&#9679;</span> No datasheets indexed yet. Click "Refresh Docs" to fetch latest PA datasheets.';
+            }
+        })
+        .catch(function() {
+            document.getElementById('doc-status-text').textContent = 'Unable to check status';
+        });
+}
+
+function refreshDatasheets() {
+    var btn = document.getElementById('refresh-docs-btn');
+    btn.disabled = true;
+    btn.textContent = 'Refreshing...';
+    document.getElementById('doc-status-text').innerHTML = '<span style="color: #2e86c1;">&#9679;</span> Fetching and indexing PA datasheets...';
+
+    fetch('/refresh-datasheets', { method: 'POST' })
+        .then(function(resp) { return resp.json(); })
+        .then(function(data) {
+            btn.disabled = false;
+            btn.textContent = 'Refresh Docs';
+            if (data.error) {
+                document.getElementById('doc-status-text').textContent = 'Error: ' + data.error;
+            } else {
+                checkDocStatus();
+            }
+        })
+        .catch(function(err) {
+            btn.disabled = false;
+            btn.textContent = 'Refresh Docs';
+            document.getElementById('doc-status-text').textContent = 'Refresh failed: ' + err.message;
         });
 }
 

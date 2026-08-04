@@ -36,6 +36,7 @@ Input site requirements and get PA firewall model recommendations for SD-WAN dep
 - Licensing recommendations (auto-suggests BPLA bundle for 3+ security features)
 - Full device specs: throughput, sessions, tunnels, ports, form factor, HA support
 - Downloadable Excel report with model comparison sheet
+- **Datasheet References (RAG)**: Auto-fetches and indexes official PA datasheets, surfaces relevant excerpts alongside sizing recommendations
 
 ## Quick Start
 
@@ -159,7 +160,13 @@ parser/
 │   ├── models.py              # PA + VM-Series specs, licensing data
 │   ├── calculator.py          # Sizing algorithm
 │   ├── html_dashboard.py      # Sizing dashboard HTML
-│   └── excel_report.py        # Sizing Excel report
+│   ├── excel_report.py        # Sizing Excel report
+│   └── rag/                   # Datasheet RAG pipeline
+│       ├── sources.py         # PA datasheet URL registry
+│       ├── refresh.py         # Auto-fetch and refresh datasheets
+│       ├── ingest.py          # PDF parsing and chunking
+│       ├── store.py           # ChromaDB vector store
+│       └── retrieval.py       # Query and retrieve relevant excerpts
 ├── templates/
 │   └── index.html             # Web UI
 └── static/
@@ -172,4 +179,7 @@ parser/
 - openpyxl -- Excel report generation
 - lxml -- XML parsing
 - PyYAML -- Ansible playbook generation
+- chromadb -- Vector store for datasheet RAG
+- pdfplumber -- PDF text extraction
+- duckduckgo-search -- Datasheet URL discovery
 - nginx -- HTTPS reverse proxy with self-signed certificate
