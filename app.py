@@ -17,7 +17,7 @@ from report import excel_generator
 from report.html_dashboard import generate_dashboard_fragment
 from report.masker import mask_results
 from report.migration_dashboard import generate_migration_dashboard_fragment
-from scm.ansible_generator import generate_ansible_zip
+from scm.terraform_generator import generate_terraform_zip
 from scm.mapper import map_results
 from scm.migration_report import generate_migration_report
 from sizing.calculator import calculate_sizing
@@ -25,6 +25,8 @@ from sizing.html_dashboard import generate_sizing_dashboard
 from sizing.excel_report import generate_sizing_report
 from sizing.rag.retrieval import get_docs_for_sizing_result
 from sizing.rag.refresh import auto_refresh_if_stale, refresh_datasheets, get_status as rag_status
+from poc.generator import generate_poc_zip
+from poc.html_dashboard import generate_poc_dashboard
 
 app = Flask(__name__)
 app.config['MAX_CONTENT_LENGTH'] = app_config.MAX_CONTENT_LENGTH
@@ -353,20 +355,20 @@ def parse_migration():
         else:
             mapped_filtered = mapped
 
-        # Generate Ansible ZIP
-        zip_path = generate_ansible_zip(
+        # Generate Terraform ZIP
+        tf_zip_path = generate_terraform_zip(
             all_results, session_dir,
             selected_features=selected_features,
             credentials=credentials,
         )
-        zip_filename = os.path.basename(zip_path)
+        tf_zip_filename = os.path.basename(tf_zip_path)
 
-        # Extract playbooks for in-tool execution
-        playbook_dir = os.path.join(session_dir, 'playbooks')
-        with zipfile.ZipFile(zip_path, 'r') as zf:
-            zf.extractall(playbook_dir)
-        # The ZIP has a top-level scm-ansible-playbooks/ prefix
-        playbook_root = os.path.join(playbook_dir, 'scm-ansible-playbooks')
+        # Extract Terraform files for in-tool execution
+        tf_project_dir = os.path.join(session_dir, 'terraform')
+        with zipfile.ZipFile(tf_zip_path, 'r') as zf:
+            zf.extractall(tf_project_dir)
+        # The ZIP has a top-level scm-terraform/ prefix
+        tf_root = os.path.join(tf_project_dir, 'scm-terraform')
 
         # Generate migration report Excel
         report_bytes = generate_migration_report(
@@ -385,18 +387,18 @@ def parse_migration():
             configs_data=configs_data,
         )
 
-        # Cache for later use (including playbook path for execution)
+        # Cache for later use (including terraform path for execution)
         _cache_cleanup()
         _session_cache[session_id] = {
             'configs_data': configs_data,
-            'playbook_root': playbook_root,
+            'tf_root': tf_root,
             'timestamp': time.time(),
         }
 
         return jsonify({
             'dashboard_html': dashboard_html,
-            'ansible_url': f'/download-ansible/{session_id}/{zip_filename}',
-            'ansible_filename': zip_filename,
+            'terraform_url': f'/download-terraform/{session_id}/{tf_zip_filename}',
+            'terraform_filename': tf_zip_filename,
             'excel_url': f'/download/{session_id}/{report_filename}',
             'excel_filename': report_filename,
             'session_id': session_id,
@@ -408,48 +410,9 @@ def parse_migration():
         return jsonify({'error': f'Unexpected error: {e}'}), 500
 
 
-@app.route('/generate-ansible/<session_id>', methods=['POST'])
-def generate_ansible(session_id):
-    """Generate Ansible playbook ZIP from cached parsed results."""
-    if '..' in session_id or '/' in session_id:
-        return jsonify({'error': 'Invalid session'}), 400
-
-    _cache_cleanup()
-    cached = _session_cache.get(session_id)
-    if not cached:
-        return jsonify({'error': 'Session expired. Please re-upload and parse your config files.'}), 404
-
-    try:
-        # Collect all FeatureResults across all configs
-        all_results = []
-        for cfg in cached['configs_data']:
-            all_results.extend(cfg['results'])
-
-        # Get selected features from request body (if provided)
-        selected_features = None
-        if request.is_json and request.json:
-            selected_features = request.json.get('selected_features')
-
-        session_dir = os.path.join(app_config.REPORT_DIR, session_id)
-        os.makedirs(session_dir, exist_ok=True)
-
-        zip_path = generate_ansible_zip(
-            all_results, session_dir,
-            selected_features=selected_features,
-        )
-        zip_filename = os.path.basename(zip_path)
-
-        return jsonify({
-            'ansible_url': f'/download-ansible/{session_id}/{zip_filename}',
-            'ansible_filename': zip_filename,
-        })
-    except Exception as e:
-        return jsonify({'error': f'Failed to generate Ansible playbooks: {e}'}), 500
-
-
-@app.route('/download-ansible/<session_id>/<filename>')
-def download_ansible(session_id, filename):
-    """Serve an Ansible playbook ZIP file scoped to a session directory."""
+@app.route('/download-terraform/<session_id>/<filename>')
+def download_terraform(session_id, filename):
+    """Serve a Terraform ZIP file scoped to a session directory."""
     if '..' in session_id or '..' in filename or '/' in session_id:
         return 'Invalid request', 400
 
@@ -465,141 +428,124 @@ def download_ansible(session_id, filename):
     )
 
 
-def _get_playbook_root(session_id: str) -> str | None:
-    """Resolve playbook root directory for a session (works across workers)."""
-    playbook_root = os.path.join(app_config.REPORT_DIR, session_id, 'playbooks', 'scm-ansible-playbooks')
-    if os.path.isdir(playbook_root):
-        return playbook_root
-    # Also check session cache (same worker)
+def _get_tf_root(session_id: str) -> str | None:
+    """Resolve Terraform project root directory for a session."""
+    tf_root = os.path.join(app_config.REPORT_DIR, session_id, 'terraform', 'scm-terraform')
+    if os.path.isdir(tf_root):
+        return tf_root
     cached = _session_cache.get(session_id)
-    if cached and 'playbook_root' in cached and os.path.isdir(cached['playbook_root']):
-        return cached['playbook_root']
+    if cached and 'tf_root' in cached and os.path.isdir(cached['tf_root']):
+        return cached['tf_root']
     return None
 
 
-@app.route('/playbook-list/<session_id>')
-def playbook_list(session_id):
-    """List available playbooks for a session."""
+@app.route('/tf-file-list/<session_id>')
+def tf_file_list(session_id):
+    """List Terraform files for a session."""
     if '..' in session_id or '/' in session_id:
         return jsonify({'error': 'Invalid session'}), 400
 
-    playbook_root = _get_playbook_root(session_id)
-    if not playbook_root:
+    tf_root = _get_tf_root(session_id)
+    if not tf_root:
         return jsonify({'error': 'Session expired. Please re-upload your config.'}), 404
 
-    playbooks = sorted(
-        f for f in os.listdir(playbook_root)
-        if f.endswith('.yml') and not f.startswith('.')
+    tf_files = sorted(
+        f for f in os.listdir(tf_root)
+        if f.endswith('.tf') and not f.startswith('.')
     )
-    return jsonify({'playbooks': playbooks})
+    return jsonify({'files': tf_files})
 
 
-@app.route('/run-playbook/<session_id>', methods=['POST'])
-def run_playbook(session_id):
-    """Run one or more Ansible playbooks sequentially and stream output via SSE."""
+@app.route('/run-terraform/<session_id>', methods=['POST'])
+def run_terraform(session_id):
+    """Run terraform init/plan/apply and stream output via SSE."""
     if '..' in session_id or '/' in session_id:
         return jsonify({'error': 'Invalid session'}), 400
 
-    playbook_root = _get_playbook_root(session_id)
-    if not playbook_root:
+    tf_root = _get_tf_root(session_id)
+    if not tf_root:
         return jsonify({'error': 'Session expired. Please re-upload your config.'}), 404
 
     cached = _session_cache.get(session_id) or {}
 
     data = request.get_json(force=True)
+    action = data.get('action', 'plan')  # init, plan, apply, destroy
     creds = data.get('credentials', {})
 
-    # Accept single playbook or list of playbooks
-    playbooks = data.get('playbooks', [])
-    if not playbooks:
-        single = data.get('playbook', '')
-        if single:
-            playbooks = [single]
-    if not playbooks:
-        return jsonify({'error': 'No playbooks specified'}), 400
+    if action not in ('init', 'plan', 'apply', 'destroy'):
+        return jsonify({'error': f'Invalid action: {action}'}), 400
 
-    # Validate all playbook names
-    for pb in playbooks:
-        if not pb or '..' in pb or '/' in pb:
-            return jsonify({'error': f'Invalid playbook name: {pb}'}), 400
-        if not os.path.isfile(os.path.join(playbook_root, pb)):
-            return jsonify({'error': f'Playbook not found: {pb}'}), 404
-
-    # Validate credentials
+    # Validate credentials for plan/apply/destroy
     client_id = creds.get('client_id', '').strip()
     client_secret = creds.get('client_secret', '').strip()
     tsg_id = creds.get('tsg_id', '').strip()
-    if not client_id or not client_secret or not tsg_id:
+
+    if action != 'init' and (not client_id or not client_secret or not tsg_id):
         return jsonify({'error': 'All SCM credentials (Client ID, Client Secret, TSG ID) are required.'}), 400
 
-    # Write credentials to the playbook working directory
-    import yaml
-    creds_path = os.path.join(playbook_root, 'group_vars', 'all', 'scm_credentials.yml')
-    creds_data = {
-        'scm_client_id': client_id,
-        'scm_client_secret': client_secret,
-        'scm_tsg_id': tsg_id,
-        'scm_auth_url': 'https://auth.apps.paloaltonetworks.com/am/oauth2/access_token',
-        'scm_base_url': 'https://api.sase.paloaltonetworks.com',
-    }
-    with open(creds_path, 'w') as cf:
-        yaml.dump(creds_data, cf, default_flow_style=False)
+    # Write credentials to terraform.tfvars
+    if client_id and client_secret and tsg_id:
+        tfvars_path = os.path.join(tf_root, 'terraform.tfvars')
+        with open(tfvars_path, 'w') as vf:
+            vf.write(f'scm_client_id     = "{client_id}"\n')
+            vf.write(f'scm_client_secret = "{client_secret}"\n')
+            vf.write(f'scm_tsg_id        = "{tsg_id}"\n')
+
+    # Build terraform command
+    if action == 'init':
+        cmd = ['terraform', 'init']
+    elif action == 'plan':
+        cmd = ['terraform', 'plan', '-no-color']
+    elif action == 'apply':
+        cmd = ['terraform', 'apply', '-auto-approve', '-no-color']
+    elif action == 'destroy':
+        cmd = ['terraform', 'destroy', '-auto-approve', '-no-color']
 
     def generate():
-        """SSE generator that runs playbooks sequentially and streams output."""
-        total = len(playbooks)
-        for idx, playbook in enumerate(playbooks, 1):
-            # Send playbook start event
-            yield f'event: playbook_start\ndata: {json.dumps({"playbook": playbook, "index": idx, "total": total})}\n\n'
+        """SSE generator that runs terraform and streams output."""
+        yield f'event: tf_start\ndata: {json.dumps({"action": action})}\n\n'
 
-            try:
-                proc = subprocess.Popen(
-                    ['ansible-playbook', '-i', 'inventory/hosts.yml', playbook, '-v'],
-                    cwd=playbook_root,
-                    stdout=subprocess.PIPE,
-                    stderr=subprocess.STDOUT,
-                    text=True,
-                    bufsize=1,
-                    env={**os.environ, 'ANSIBLE_FORCE_COLOR': '0', 'PYTHONUNBUFFERED': '1'},
-                )
-                cached['process'] = proc
+        try:
+            proc = subprocess.Popen(
+                cmd,
+                cwd=tf_root,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+                text=True,
+                bufsize=1,
+                env={**os.environ, 'TF_IN_AUTOMATION': 'true'},
+            )
+            cached['process'] = proc
 
-                for line in iter(proc.stdout.readline, ''):
-                    escaped = json.dumps(line.rstrip('\n'))
-                    yield f'data: {escaped}\n\n'
+            for line in iter(proc.stdout.readline, ''):
+                escaped = json.dumps(line.rstrip('\n'))
+                yield f'data: {escaped}\n\n'
 
-                proc.wait()
-                exit_code = proc.returncode
+            proc.wait()
+            exit_code = proc.returncode
 
-                yield f'event: playbook_end\ndata: {json.dumps({"playbook": playbook, "index": idx, "total": total, "exit_code": exit_code})}\n\n'
+            yield f'event: tf_end\ndata: {json.dumps({"action": action, "exit_code": exit_code})}\n\n'
 
-                # Stop running remaining playbooks if one fails
-                if exit_code != 0:
-                    yield f'data: {json.dumps(f"Playbook {playbook} failed — stopping queue.")}\n\n'
-                    yield f'event: done\ndata: {json.dumps({"exit_code": exit_code, "stopped_at": playbook})}\n\n'
-                    return
+        except FileNotFoundError:
+            yield f'data: {json.dumps("ERROR: terraform not found. Please install Terraform.")}\n\n'
+            yield f'event: done\ndata: {json.dumps({"exit_code": 127})}\n\n'
+            return
+        except Exception as e:
+            yield f'data: {json.dumps(f"ERROR: {str(e)}")}\n\n'
+            yield f'event: done\ndata: {json.dumps({"exit_code": 1})}\n\n'
+            return
+        finally:
+            cached.pop('process', None)
 
-            except FileNotFoundError:
-                yield f'data: {json.dumps("ERROR: ansible-playbook not found.")}\n\n'
-                yield f'event: done\ndata: {json.dumps({"exit_code": 127})}\n\n'
-                return
-            except Exception as e:
-                yield f'data: {json.dumps(f"ERROR: {str(e)}")}\n\n'
-                yield f'event: done\ndata: {json.dumps({"exit_code": 1})}\n\n'
-                return
-            finally:
-                cached.pop('process', None)
-
-        # All playbooks completed successfully
-        yield f'event: done\ndata: {json.dumps({"exit_code": 0})}\n\n'
+        yield f'event: done\ndata: {json.dumps({"exit_code": exit_code})}\n\n'
 
     return Response(generate(), mimetype='text/event-stream',
                     headers={'Cache-Control': 'no-cache', 'X-Accel-Buffering': 'no'})
 
 
-@app.route('/stop-playbook/<session_id>', methods=['POST'])
-def stop_playbook(session_id):
-    """Stop a running Ansible playbook."""
+@app.route('/stop-terraform/<session_id>', methods=['POST'])
+def stop_terraform(session_id):
+    """Stop a running Terraform process."""
     if '..' in session_id or '/' in session_id:
         return jsonify({'error': 'Invalid session'}), 400
 
@@ -616,7 +562,7 @@ def stop_playbook(session_id):
             proc.kill()
         return jsonify({'stopped': True})
 
-    return jsonify({'stopped': False, 'message': 'No running playbook'})
+    return jsonify({'stopped': False, 'message': 'No running process'})
 
 
 @app.route('/refresh-datasheets', methods=['POST'])
@@ -686,6 +632,158 @@ def sizing():
         return jsonify({'error': str(e)}), 400
     except Exception as e:
         return jsonify({'error': f'Unexpected error: {e}'}), 500
+
+
+def _safe_int(value, default: int) -> int:
+    """Convert value to int, returning default if empty or invalid."""
+    if not value or not str(value).strip():
+        return default
+    try:
+        return int(value)
+    except (ValueError, TypeError):
+        return default
+
+
+@app.route('/generate-poc', methods=['POST'])
+def poc_config():
+    """Generate Ansible playbooks for SD-WAN POC deployment."""
+    try:
+        session_id, session_dir = _make_session_dir()
+
+        # Parse deployment basics
+        template_name = request.form.get('template_name', 'POC-Template').strip() or 'POC-Template'
+        device_group = request.form.get('device_group', 'POC-DeviceGroup').strip() or 'POC-DeviceGroup'
+        panorama_ip = request.form.get('panorama_ip', '').strip()
+
+        # Parse hub devices from dynamic form rows
+        hub_devices = _parse_device_rows(request.form, 'hub')
+        branch_devices = _parse_device_rows(request.form, 'branch')
+
+        # Parse WAN links from dynamic form rows
+        hub_links = _parse_link_rows(request.form, 'hub')
+        branch_links = _parse_link_rows(request.form, 'branch')
+
+        # Parse security zones
+        zones = _parse_zone_rows(request.form)
+
+        inputs = {
+            'panorama_ip': panorama_ip,
+            'template_name': template_name,
+            'device_group': device_group,
+            'topology_type': request.form.get('topology_type', 'hub-spoke'),
+            'cluster_name': request.form.get('cluster_name', '').strip(),
+            'vpn_address_pool': request.form.get('vpn_address_pool', '').strip(),
+            'hub_devices': hub_devices,
+            'branch_devices': branch_devices,
+            'hub_links': hub_links,
+            'branch_links': branch_links,
+            'zones': zones,
+            'probe_frequency': _safe_int(request.form.get('probe_frequency'), 5),
+            'probe_idle_time': _safe_int(request.form.get('probe_idle_time'), 60),
+            'failback_hold_time': _safe_int(request.form.get('failback_hold_time'), 120),
+            'latency_threshold': _safe_int(request.form.get('latency_threshold'), 100),
+            'latency_sensitivity': request.form.get('latency_sensitivity', 'medium') or 'medium',
+            'jitter_threshold': _safe_int(request.form.get('jitter_threshold'), 50),
+            'jitter_sensitivity': request.form.get('jitter_sensitivity', 'medium') or 'medium',
+            'pkt_loss_threshold': _safe_int(request.form.get('pkt_loss_threshold'), 5),
+            'pkt_loss_sensitivity': request.form.get('pkt_loss_sensitivity', 'medium') or 'medium',
+            'td_method': request.form.get('td_method', 'best-available-path'),
+            'fec_enabled': request.form.get('fec_enabled') == 'yes',
+            'policy_enabled': request.form.get('policy_enabled') == 'yes',
+            'policy_template': request.form.get('policy_template', 'default'),
+        }
+
+        # Parse custom policy rules if policy is enabled and template is 'custom'
+        if inputs['policy_enabled'] and inputs['policy_template'] == 'custom':
+            inputs['custom_rules'] = _parse_custom_rules(request.form)
+
+        zip_path, summary = generate_poc_zip(inputs, session_dir)
+        zip_filename = os.path.basename(zip_path)
+        dashboard_html = generate_poc_dashboard(inputs, summary)
+
+        return jsonify({
+            'dashboard_html': dashboard_html,
+            'ansible_url': f'/download-ansible/{session_id}/{zip_filename}',
+            'ansible_filename': zip_filename,
+            'session_id': session_id,
+        })
+
+    except ValueError as e:
+        return jsonify({'error': str(e)}), 400
+    except Exception as e:
+        return jsonify({'error': f'Unexpected error: {e}'}), 500
+
+
+def _parse_device_rows(form, role: str) -> list[dict]:
+    """Parse dynamic device rows from form: poc_{role}_serial_0, poc_{role}_name_0, ..."""
+    devices = []
+    i = 0
+    while True:
+        serial = form.get(f'poc_{role}_serial_{i}', '').strip()
+        name = form.get(f'poc_{role}_name_{i}', '').strip()
+        if not serial and not name:
+            break
+        devices.append({
+            'serial': serial or f'{role}-{i+1}',
+            'name': name or f'{role.title()}-{i+1}',
+            'site': form.get(f'poc_{role}_site_{i}', '').strip(),
+            'bgp_as': form.get(f'poc_{role}_as_{i}', '').strip(),
+            'router_id': form.get(f'poc_{role}_rid_{i}', '').strip(),
+            'loopback': form.get(f'poc_{role}_loopback_{i}', '').strip(),
+            'logical_router': form.get(f'poc_{role}_lr_{i}', '').strip() or 'default',
+        })
+        i += 1
+    return devices
+
+
+def _parse_link_rows(form, role: str) -> list[dict]:
+    """Parse dynamic WAN link rows from form: poc_{role}_link_name_0, ..."""
+    links = []
+    i = 0
+    while True:
+        name = form.get(f'poc_{role}_link_name_{i}', '').strip()
+        if not name:
+            break
+        links.append({
+            'name': name,
+            'type': form.get(f'poc_{role}_link_type_{i}', 'public').strip(),
+            'bandwidth': form.get(f'poc_{role}_link_bw_{i}', '100').strip() or '100',
+            'tag': form.get(f'poc_{role}_link_tag_{i}', '').strip(),
+        })
+        i += 1
+    return links
+
+
+def _parse_custom_rules(form) -> list[dict]:
+    """Parse custom SD-WAN policy rules from form."""
+    rules = []
+    i = 0
+    while True:
+        name = form.get(f'poc_rule_name_{i}', '').strip()
+        if not name:
+            break
+        rules.append({
+            'name': name,
+            'apps': form.get(f'poc_rule_apps_{i}', 'any').strip(),
+        })
+        i += 1
+    return rules
+
+
+def _parse_zone_rows(form) -> list[dict]:
+    """Parse security zone rows from form: poc_zone_name_0, poc_zone_type_0, ..."""
+    zones = []
+    i = 0
+    while True:
+        name = form.get(f'poc_zone_name_{i}', '').strip()
+        if not name:
+            break
+        zones.append({
+            'name': name,
+            'type': form.get(f'poc_zone_type_{i}', 'layer3').strip(),
+        })
+        i += 1
+    return zones
 
 
 if __name__ == '__main__':

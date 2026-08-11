@@ -24,12 +24,17 @@
         <div class="mode-card" onclick="selectMode('scm')">
             <div class="mode-icon">&#9881;</div>
             <h3>Generate SCM Config</h3>
-            <p>Convert PAN-OS SD-WAN configuration to SCM-compatible Ansible playbooks for automated migration to Strata Cloud Manager</p>
+            <p>Convert PAN-OS SD-WAN configuration to Terraform HCL for automated deployment to Strata Cloud Manager</p>
         </div>
         <div class="mode-card" onclick="selectMode('sizing')">
             <div class="mode-icon">&#128290;</div>
             <h3>Sizing Calculator</h3>
             <p>Get PA firewall sizing recommendations for SD-WAN deployments based on bandwidth, sessions, tunnels, and security requirements</p>
+        </div>
+        <div class="mode-card" onclick="selectMode('poc')">
+            <div class="mode-icon">&#9889;</div>
+            <h3>POC Config Generator</h3>
+            <p>Generate Ansible playbooks to configure PAN-OS SD-WAN on Panorama — interface profiles, VPN topology, policies, and routing</p>
         </div>
     </div>
 </div>
@@ -101,7 +106,7 @@
                     <div class="mask-section">
                         <div class="mask-header">
                             <span class="mask-title">SCM Credentials (Optional)</span>
-                            <span style="font-size:11px; color:var(--text-secondary);">Pre-fills Ansible playbooks</span>
+                            <span style="font-size:11px; color:var(--text-secondary);">Pre-fills Terraform config</span>
                         </div>
                         <p style="font-size:11px; color:var(--text-secondary); margin-bottom:10px;">
                             Leave blank to use placeholders. You can edit <code>scm_credentials.yml</code> in the downloaded ZIP later.
@@ -147,41 +152,7 @@
     <div style="max-width: 1100px; margin: 0 auto; padding: 16px;">
         <div class="dashboard-actions">
             <a id="excel-download-btn" class="btn btn-success" href="#" download style="width:auto; text-decoration:none;">Download Excel Report</a>
-            <button id="ansible-toggle-btn" class="btn btn-primary" onclick="toggleAnsiblePanel()" style="width:auto;">Download Ansible Playbooks</button>
             <button class="btn btn-secondary" onclick="showLanding()" style="width:auto;">New Analysis</button>
-        </div>
-
-        <!-- Ansible Feature Selection Panel -->
-        <div id="ansible-panel" style="display:none; margin-top:16px;">
-            <div style="background:#fff; border:1px solid #d4dbe6; border-radius:10px; padding:20px; box-shadow:0 2px 8px rgba(0,0,0,0.06);">
-                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px;">
-                    <span style="font-size:13px; font-weight:600; color:#1a1a2e;">Select SD-WAN Objects to Migrate</span>
-                    <label style="font-size:12px; color:#fa582d; font-weight:600; cursor:pointer; display:flex; align-items:center; gap:4px;">
-                        <input type="checkbox" id="ansible-select-all" onchange="toggleAllAnsible()" checked style="width:14px;height:14px;cursor:pointer;"> Select All
-                    </label>
-                </div>
-                <div style="display:grid; grid-template-columns:1fr 1fr; gap:6px 24px;">
-                    <label class="ansible-feat-label"><input type="checkbox" class="ansible-feat" value="sdwan_vpn_clusters" checked> SD-WAN VPN Clusters</label>
-                    <label class="ansible-feat-label"><input type="checkbox" class="ansible-feat" value="sdwan_devices" checked> SD-WAN Devices</label>
-                    <label class="ansible-feat-label"><input type="checkbox" class="ansible-feat" value="sdwan_interface_profiles" checked> SD-WAN Interface Profiles</label>
-                    <label class="ansible-feat-label"><input type="checkbox" class="ansible-feat" value="sdwan_path_quality_profiles" checked> Path Quality Profiles</label>
-                    <label class="ansible-feat-label"><input type="checkbox" class="ansible-feat" value="sdwan_traffic_distribution_profiles" checked> Traffic Distribution Profiles</label>
-                    <label class="ansible-feat-label"><input type="checkbox" class="ansible-feat" value="sdwan_policies" checked> SD-WAN Policies (App-ID)</label>
-                    <label class="ansible-feat-label"><input type="checkbox" class="ansible-feat" value="security_rules" checked> Security Rules</label>
-                    <label class="ansible-feat-label"><input type="checkbox" class="ansible-feat" value="nat_rules" checked> NAT Rules</label>
-                    <label class="ansible-feat-label"><input type="checkbox" class="ansible-feat" value="ike_gateways" checked> IKE Gateways</label>
-                    <label class="ansible-feat-label"><input type="checkbox" class="ansible-feat" value="ipsec_tunnels" checked> IPSec Tunnels</label>
-                    <label class="ansible-feat-label"><input type="checkbox" class="ansible-feat" value="bgp_routing_profiles" checked> BGP Routing Profiles</label>
-                    <label class="ansible-feat-label"><input type="checkbox" class="ansible-feat" value="sdwan_bgp_policies" checked> SD-WAN BGP Policies</label>
-                    <label class="ansible-feat-label"><input type="checkbox" class="ansible-feat" value="interfaces" checked> Interfaces</label>
-                    <label class="ansible-feat-label"><input type="checkbox" class="ansible-feat" value="zones" checked> Zones</label>
-                    <label class="ansible-feat-label"><input type="checkbox" class="ansible-feat" value="custom_applications" checked> Custom Applications</label>
-                </div>
-                <div style="margin-top:16px; display:flex; gap:10px;">
-                    <button id="ansible-download-btn" class="btn btn-primary" onclick="downloadAnsible()" style="width:auto;">Generate &amp; Download</button>
-                    <button class="btn btn-secondary" onclick="toggleAnsiblePanel()" style="width:auto;">Cancel</button>
-                </div>
-            </div>
         </div>
     </div>
     <div class="dashboard-results" id="dashboard-content"></div>
@@ -191,7 +162,7 @@
 <div id="migration-results-section" style="display:none;">
     <div style="max-width: 1100px; margin: 0 auto; padding: 16px;">
         <div class="dashboard-actions">
-            <a id="migration-ansible-btn" class="btn btn-primary" href="#" download style="width:auto; text-decoration:none;">Download Ansible Playbooks</a>
+            <a id="migration-terraform-btn" class="btn btn-primary" href="#" download style="width:auto; text-decoration:none;">Download Terraform Config</a>
             <a id="migration-excel-btn" class="btn btn-success" href="#" download style="width:auto; text-decoration:none;">Download Migration Report</a>
             <button class="btn btn-secondary" onclick="showLanding()" style="width:auto;">New Analysis</button>
         </div>
@@ -199,7 +170,7 @@
         <!-- Deploy to SCM Panel -->
         <div class="deploy-panel" id="deploy-panel">
             <div class="deploy-panel-header" onclick="toggleDeployPanel()">
-                <h4>Deploy to SCM</h4>
+                <h4>Deploy to SCM via Terraform</h4>
                 <span class="toggle-icon" id="deploy-toggle-icon">&#9660;</span>
             </div>
             <div class="deploy-panel-body" id="deploy-panel-body">
@@ -222,31 +193,20 @@
                 </div>
 
                 <div style="margin-bottom:12px;">
-                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
-                        <div style="font-size:12px; font-weight:600; color:var(--text-primary);">Playbook Queue</div>
-                        <div style="display:flex; gap:8px; align-items:center;">
-                            <select id="playbook-select" class="playbook-select" style="min-width:240px;">
-                                <option value="">Loading playbooks...</option>
-                            </select>
-                            <button class="btn-add-playbook" onclick="addPlaybookToQueue()">+ Add</button>
-                        </div>
-                    </div>
-                    <div id="playbook-queue" class="playbook-queue">
-                        <div class="playbook-queue-empty">Add playbooks from the dropdown above. They will run in order.</div>
-                    </div>
-                    <div style="margin-top:10px; display:flex; gap:8px; align-items:center;">
-                        <button class="btn-run" id="run-btn" onclick="runPlaybook()">Run All</button>
-                        <button class="btn-secondary" onclick="clearPlaybookQueue()" style="padding:7px 14px; font-size:12px;">Clear</button>
-                        <span id="queue-count" style="font-size:11px; color:var(--text-secondary);"></span>
+                    <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
+                        <button class="btn-run" id="tf-init-btn" onclick="runTerraform('init')">terraform init</button>
+                        <button class="btn-run" id="tf-plan-btn" onclick="runTerraform('plan')">terraform plan</button>
+                        <button class="btn-run" id="tf-apply-btn" onclick="runTerraform('apply')" style="background:#28a745;">terraform apply</button>
+                        <button class="btn-run" id="tf-destroy-btn" onclick="runTerraform('destroy')" style="background:#dc3545;">terraform destroy</button>
                     </div>
                 </div>
 
                 <div class="terminal-wrapper" id="terminal-wrapper" style="display:none;">
                     <div class="terminal-header">
-                        <span id="terminal-title">$ ansible-playbook</span>
+                        <span id="terminal-title">$ terraform</span>
                         <div style="display:flex; align-items:center; gap:8px;">
                             <span class="run-status idle" id="run-status">Idle</span>
-                            <button class="btn-stop" id="stop-btn" onclick="stopPlaybook()" style="display:none;">Stop</button>
+                            <button class="btn-stop" id="stop-btn" onclick="stopTerraform()" style="display:none;">Stop</button>
                         </div>
                     </div>
                     <pre class="terminal-output" id="terminal-output"></pre>
@@ -498,8 +458,231 @@
     <div class="dashboard-results" id="sizing-dashboard-content"></div>
 </div>
 
+<!-- POC Config Generator Form -->
+<div class="container" id="poc-form-section" style="display:none;">
+    <div style="margin-bottom:12px;">
+        <button class="btn-back" onclick="showLanding()">&larr; Back</button>
+    </div>
+    <form id="poc-form" onsubmit="submitPoc(event)">
+
+        <!-- Step 1: Deployment Basics -->
+        <div class="sizing-section-title">Step 1: Deployment Basics</div>
+        <div class="sizing-input-grid">
+            <div class="sizing-input-group">
+                <label>Panorama IP / Hostname</label>
+                <input type="text" id="poc-panorama-ip" placeholder="e.g. 192.168.1.1 or panorama.corp.com">
+                <span class="sizing-input-hint">Used in generated inventory and credentials</span>
+            </div>
+            <div class="sizing-input-group">
+                <label>Template Name</label>
+                <input type="text" id="poc-template" placeholder="e.g. SDWAN-Template">
+                <span class="sizing-input-hint">Panorama template for device configuration</span>
+            </div>
+            <div class="sizing-input-group">
+                <label>Device Group Name</label>
+                <input type="text" id="poc-device-group" placeholder="e.g. SDWAN-DeviceGroup">
+                <span class="sizing-input-hint">Panorama device group for policies and profiles</span>
+            </div>
+        </div>
+
+        <!-- Step 2: Topology & VPN -->
+        <div class="sizing-section-title">Step 2: Topology &amp; VPN</div>
+        <div class="sizing-input-grid">
+            <div class="sizing-input-group">
+                <label>Topology Type</label>
+                <select id="poc-topology">
+                    <option value="hub-spoke" selected>Hub-Spoke</option>
+                    <option value="full-mesh">Full Mesh</option>
+                </select>
+            </div>
+            <div class="sizing-input-group">
+                <label>VPN Cluster Name</label>
+                <input type="text" id="poc-cluster-name" placeholder="e.g. SDWAN-VPN-Cluster">
+                <span class="sizing-input-hint">SD-WAN VPN cluster identifier</span>
+            </div>
+            <div class="sizing-input-group">
+                <label>VPN Address Pool</label>
+                <input type="text" id="poc-vpn-pool" placeholder="e.g. 172.16.0.0/16">
+                <span class="sizing-input-hint">IP subnet for SD-WAN VPN tunnel addressing</span>
+            </div>
+        </div>
+
+        <div style="margin-top: 12px;">
+            <label style="font-weight: 600; font-size: 13px; margin-bottom: 6px; display: block;">Hub Devices</label>
+            <div id="poc-hub-devices"></div>
+            <button type="button" class="btn btn-secondary poc-add-btn" onclick="addPocDevice('hub')">+ Add Hub</button>
+        </div>
+
+        <div style="margin-top: 12px;">
+            <label style="font-weight: 600; font-size: 13px; margin-bottom: 6px; display: block;">Branch Devices</label>
+            <div id="poc-branch-devices"></div>
+            <button type="button" class="btn btn-secondary poc-add-btn" onclick="addPocDevice('branch')">+ Add Branch</button>
+        </div>
+
+        <!-- Step 3: Security Zones -->
+        <div class="sizing-section-title">Step 3: Security Zones</div>
+        <div style="margin-top: 12px;">
+            <label style="font-weight: 600; font-size: 13px; margin-bottom: 6px; display: block;">Zones</label>
+            <div id="poc-zones"></div>
+            <button type="button" class="btn btn-secondary poc-add-btn" onclick="addPocZone()">+ Add Zone</button>
+        </div>
+
+        <!-- Step 4: SD-WAN Interface Profiles -->
+        <div class="sizing-section-title">Step 4: SD-WAN Interface Profiles</div>
+        <div class="sizing-input-grid" style="grid-template-columns: 1fr 1fr 1fr;">
+            <div class="sizing-input-group">
+                <label>Probe Frequency (s)</label>
+                <input type="number" id="poc-probe-freq" placeholder="e.g. 5" min="1" max="60">
+                <span class="sizing-input-hint">Path monitoring probe interval</span>
+            </div>
+            <div class="sizing-input-group">
+                <label>Probe Idle Time (s)</label>
+                <input type="number" id="poc-probe-idle" placeholder="e.g. 60" min="10" max="300">
+                <span class="sizing-input-hint">Idle timeout before probing resumes</span>
+            </div>
+            <div class="sizing-input-group">
+                <label>Failback Hold Time (s)</label>
+                <input type="number" id="poc-failback" placeholder="e.g. 120" min="0" max="600">
+                <span class="sizing-input-hint">Wait time before failing back to primary</span>
+            </div>
+        </div>
+        <div style="margin-top: 12px;">
+            <label style="font-weight: 600; font-size: 13px; margin-bottom: 6px; display: block;">Hub Interface Profiles</label>
+            <div id="poc-hub-links"></div>
+            <button type="button" class="btn btn-secondary poc-add-btn" onclick="addPocLink('hub')">+ Add Hub Profile</button>
+        </div>
+        <div style="margin-top: 12px;">
+            <label style="font-weight: 600; font-size: 13px; margin-bottom: 6px; display: block;">Branch Interface Profiles</label>
+            <div id="poc-branch-links"></div>
+            <button type="button" class="btn btn-secondary poc-add-btn" onclick="addPocLink('branch')">+ Add Branch Profile</button>
+        </div>
+
+        <!-- Step 5: Traffic Management -->
+        <div class="sizing-section-title">Step 5: Traffic Management</div>
+        <div class="sizing-input-grid">
+            <div class="sizing-input-group">
+                <label>Traffic Distribution Method</label>
+                <select id="poc-td-method">
+                    <option value="best-available-path" selected>Best Available Path</option>
+                    <option value="top-down">Top Down</option>
+                    <option value="weighted">Weighted</option>
+                </select>
+            </div>
+            <div class="sizing-input-group" style="display: flex; align-items: center; padding-top: 20px;">
+                <label class="sizing-security-toggle" style="margin: 0;">
+                    <div class="toggle-switch">
+                        <input type="checkbox" id="poc-fec">
+                        <span class="toggle-slider"></span>
+                    </div>
+                    <div class="sizing-security-info">
+                        <span class="sizing-security-name">Forward Error Correction (FEC)</span>
+                    </div>
+                </label>
+            </div>
+        </div>
+        <div class="sizing-input-grid" style="margin-top: 12px;">
+            <div class="sizing-input-group">
+                <label>Latency Threshold (ms)</label>
+                <input type="number" id="poc-latency" placeholder="e.g. 100" min="1" max="1000">
+                <span class="sizing-input-hint">Maximum acceptable latency</span>
+            </div>
+            <div class="sizing-input-group">
+                <label>Latency Sensitivity</label>
+                <select id="poc-latency-sens">
+                    <option value="" disabled selected>Select sensitivity</option>
+                    <option value="low">Low</option>
+                    <option value="medium">Medium</option>
+                    <option value="high">High</option>
+                </select>
+            </div>
+            <div class="sizing-input-group">
+                <label>Jitter Threshold (ms)</label>
+                <input type="number" id="poc-jitter" placeholder="e.g. 50" min="1" max="500">
+                <span class="sizing-input-hint">Maximum acceptable jitter</span>
+            </div>
+        </div>
+        <div class="sizing-input-grid" style="margin-top: 12px;">
+            <div class="sizing-input-group">
+                <label>Jitter Sensitivity</label>
+                <select id="poc-jitter-sens">
+                    <option value="" disabled selected>Select sensitivity</option>
+                    <option value="low">Low</option>
+                    <option value="medium">Medium</option>
+                    <option value="high">High</option>
+                </select>
+            </div>
+            <div class="sizing-input-group">
+                <label>Packet Loss Threshold (%)</label>
+                <input type="number" id="poc-pktloss" placeholder="e.g. 5" min="1" max="100">
+                <span class="sizing-input-hint">Maximum acceptable packet loss</span>
+            </div>
+            <div class="sizing-input-group">
+                <label>Packet Loss Sensitivity</label>
+                <select id="poc-pktloss-sens">
+                    <option value="" disabled selected>Select sensitivity</option>
+                    <option value="low">Low</option>
+                    <option value="medium">Medium</option>
+                    <option value="high">High</option>
+                </select>
+            </div>
+        </div>
+
+        <!-- Step 6: SD-WAN Policy (Optional) -->
+        <div class="sizing-section-title">Step 6: SD-WAN Policy — Traffic Steering</div>
+        <div class="sizing-input-grid" style="grid-template-columns: 1fr;">
+            <div class="sizing-input-group" style="display: flex; align-items: center; padding-top: 4px;">
+                <label class="sizing-security-toggle" style="margin: 0;">
+                    <div class="toggle-switch">
+                        <input type="checkbox" id="poc-policy-enabled" onchange="togglePocPolicySection()">
+                        <span class="toggle-slider"></span>
+                    </div>
+                    <div class="sizing-security-info">
+                        <span class="sizing-security-name">Create SD-WAN Policy for Traffic Steering</span>
+                    </div>
+                </label>
+            </div>
+        </div>
+        <div id="poc-policy-section" style="display: none; margin-top: 12px;">
+            <div class="sizing-input-grid" style="grid-template-columns: 1fr;">
+                <div class="sizing-input-group">
+                    <label>Policy Template</label>
+                    <select id="poc-policy-template" onchange="togglePocCustomRules()">
+                        <option value="default" selected>Default — All Traffic</option>
+                        <option value="voice-video">Priority Voice/Video (MS Teams, Zoom, WebEx)</option>
+                        <option value="custom">Custom Rules</option>
+                    </select>
+                </div>
+            </div>
+            <div id="poc-custom-rules-section" style="display: none; margin-top: 12px;">
+                <label style="font-weight: 600; font-size: 13px; margin-bottom: 6px; display: block;">Custom Policy Rules</label>
+                <div id="poc-custom-rules"></div>
+                <button type="button" class="btn btn-secondary poc-add-btn" onclick="addPocRule()">+ Add Rule</button>
+            </div>
+        </div>
+
+        <button type="submit" class="btn" id="poc-submit-btn" style="margin-top: 20px;">Generate POC Playbooks</button>
+    </form>
+
+    <div class="spinner" id="poc-spinner">
+        <p style="margin-top: 12px; font-size: 13px; color: var(--text-secondary);">
+            Generating Ansible playbooks for POC deployment...
+        </p>
+    </div>
+</div>
+
+<!-- POC Results -->
+<div id="poc-results-section" style="display:none;">
+    <div style="max-width: 1100px; margin: 0 auto; padding: 16px;">
+        <div class="dashboard-actions">
+            <a id="poc-ansible-btn" class="btn btn-success" href="#" download style="width:auto; text-decoration:none;">Download Ansible Playbooks</a>
+            <button class="btn btn-secondary" onclick="showLanding()" style="width:auto;">New Analysis</button>
+        </div>
+    </div>
+    <div class="dashboard-results" id="poc-dashboard-content"></div>
+</div>
+
 <div class="footer" id="main-footer">
-    PAN-OS SD-WAN Toolkit &mdash; Configuration Analysis, SCM Migration &amp; Firewall Sizing
+    PAN-OS SD-WAN Toolkit &mdash; Configuration Analysis, SCM Migration, Firewall Sizing &amp; POC Generator
 </div>
 
 <script>
@@ -519,6 +702,12 @@ function selectMode(mode) {
         document.getElementById('sizing-form-section').style.display = '';
         initSizingDropdowns();
         checkDocStatus();
+        return;
+    }
+
+    if (mode === 'poc') {
+        document.getElementById('poc-form-section').style.display = '';
+        initPocForm();
         return;
     }
 
@@ -548,6 +737,8 @@ function showLanding() {
     document.getElementById('migration-results-section').style.display = 'none';
     document.getElementById('sizing-form-section').style.display = 'none';
     document.getElementById('sizing-results-section').style.display = 'none';
+    document.getElementById('poc-form-section').style.display = 'none';
+    document.getElementById('poc-results-section').style.display = 'none';
     document.getElementById('main-footer').style.display = '';
 }
 
@@ -655,11 +846,11 @@ function showDashboard(html, excelUrl, sessionId) {
     window.scrollTo(0, 0);
 }
 
-function showMigrationDashboard(html, ansibleUrl, excelUrl, sessionId) {
+function showMigrationDashboard(html, terraformUrl, excelUrl, sessionId) {
     document.getElementById('form-section').style.display = 'none';
     document.getElementById('main-footer').style.display = 'none';
     document.getElementById('migration-dashboard-content').innerHTML = html;
-    document.getElementById('migration-ansible-btn').href = ansibleUrl;
+    document.getElementById('migration-terraform-btn').href = terraformUrl;
     document.getElementById('migration-excel-btn').href = excelUrl;
     document.getElementById('results-section').style.display = 'none';
     document.getElementById('migration-results-section').style.display = '';
@@ -670,68 +861,111 @@ function showMigrationDashboard(html, ansibleUrl, excelUrl, sessionId) {
     if (cid && cid.value) document.getElementById('deploy-client-id').value = cid.value;
     if (csec && csec.value) document.getElementById('deploy-client-secret').value = csec.value;
     if (ctsg && ctsg.value) document.getElementById('deploy-tsg-id').value = ctsg.value;
-    // Load playbook list
-    if (sessionId) loadPlaybookList(sessionId);
     window.scrollTo(0, 0);
 }
 
-// ── Ansible Panel (from report mode) ────────────────────────
+// ── Terraform Execution ─────────────────────────────────────
 
-function toggleAnsiblePanel() {
-    var panel = document.getElementById('ansible-panel');
-    panel.style.display = panel.style.display === 'none' ? 'block' : 'none';
-}
+var tfEventSource = null;
 
-function toggleAllAnsible() {
-    var allCb = document.getElementById('ansible-select-all');
-    var cbs = document.querySelectorAll('.ansible-feat');
-    for (var i = 0; i < cbs.length; i++) cbs[i].checked = allCb.checked;
-}
-
-function updateAnsibleSelectAll() {
-    var cbs = document.querySelectorAll('.ansible-feat');
-    var all = true;
-    for (var i = 0; i < cbs.length; i++) { if (!cbs[i].checked) { all = false; break; } }
-    document.getElementById('ansible-select-all').checked = all;
-}
-
-function downloadAnsible() {
+function runTerraform(action) {
     if (!currentSessionId) {
         alert('Session expired. Please re-upload and parse your config files.');
         return;
     }
-    var selected = [];
-    var cbs = document.querySelectorAll('.ansible-feat:checked');
-    for (var i = 0; i < cbs.length; i++) selected.push(cbs[i].value);
-    if (selected.length === 0) {
-        alert('Please select at least one SD-WAN object to migrate.');
+
+    var creds = {
+        client_id: document.getElementById('deploy-client-id').value.trim(),
+        client_secret: document.getElementById('deploy-client-secret').value.trim(),
+        tsg_id: document.getElementById('deploy-tsg-id').value.trim()
+    };
+
+    if (action !== 'init' && (!creds.client_id || !creds.client_secret || !creds.tsg_id)) {
+        alert('Please provide SCM credentials (Client ID, Client Secret, TSG ID).');
         return;
     }
 
-    var btn = document.getElementById('ansible-download-btn');
-    btn.disabled = true;
-    btn.textContent = 'Generating...';
+    if (action === 'destroy') {
+        if (!confirm('This will DESTROY all Terraform-managed SCM resources. Continue?')) return;
+    }
 
-    fetch('/generate-ansible/' + currentSessionId, {
+    // Show terminal
+    var wrapper = document.getElementById('terminal-wrapper');
+    wrapper.style.display = '';
+    var output = document.getElementById('terminal-output');
+    output.innerHTML = '';
+    var title = document.getElementById('terminal-title');
+    title.textContent = '$ terraform ' + action;
+    var status = document.getElementById('run-status');
+    status.textContent = 'Running';
+    status.className = 'run-status running';
+    var stopBtn = document.getElementById('stop-btn');
+    stopBtn.style.display = '';
+
+    // Disable action buttons
+    ['tf-init-btn', 'tf-plan-btn', 'tf-apply-btn', 'tf-destroy-btn'].forEach(function(id) {
+        document.getElementById(id).disabled = true;
+    });
+
+    fetch('/run-terraform/' + currentSessionId, {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({selected_features: selected})
-    })
-        .then(function(resp) {
-            return resp.json().then(function(data) {
-                if (!resp.ok) throw new Error(data.error || 'Failed to generate');
-                return data;
-            });
-        })
+        body: JSON.stringify({action: action, credentials: creds})
+    }).then(function(resp) {
+        var reader = resp.body.getReader();
+        var decoder = new TextDecoder();
+        var buffer = '';
+
+        function read() {
+            reader.read().then(function(result) {
+                if (result.done) {
+                    onTfDone(1);
+                    return;
+                }
+                buffer += decoder.decode(result.value, {stream: true});
+                var lines = buffer.split('\n');
+                buffer = lines.pop();
+                for (var i = 0; i < lines.length; i++) {
+                    var line = lines[i];
+                    if (line.startsWith('data: ')) {
+                        var text = '';
+                        try { text = JSON.parse(line.substring(6)); } catch(e) { text = line.substring(6); }
+                        output.innerHTML += escHtml(text) + '\n';
+                        output.scrollTop = output.scrollHeight;
+                    } else if (line.startsWith('event: done')) {
+                        // next data line has exit info
+                    } else if (line.startsWith('event: tf_end')) {
+                        // handled via done event
+                    }
+                }
+                read();
+            }).catch(function() { onTfDone(1); });
+        }
+        read();
+    }).catch(function(err) {
+        output.innerHTML += 'ERROR: ' + escHtml(err.message) + '\n';
+        onTfDone(1);
+    });
+}
+
+function onTfDone(exitCode) {
+    var status = document.getElementById('run-status');
+    status.textContent = exitCode === 0 ? 'Done' : 'Failed';
+    status.className = 'run-status ' + (exitCode === 0 ? 'idle' : 'failed');
+    document.getElementById('stop-btn').style.display = 'none';
+    ['tf-init-btn', 'tf-plan-btn', 'tf-apply-btn', 'tf-destroy-btn'].forEach(function(id) {
+        document.getElementById(id).disabled = false;
+    });
+}
+
+function stopTerraform() {
+    fetch('/stop-terraform/' + currentSessionId, { method: 'POST' })
+        .then(function(resp) { return resp.json(); })
         .then(function(data) {
-            btn.disabled = false;
-            btn.textContent = 'Generate & Download';
-            window.location.href = data.ansible_url;
-        })
-        .catch(function(err) {
-            btn.disabled = false;
-            btn.textContent = 'Generate & Download';
-            alert('Error: ' + err.message);
+            if (data.stopped) {
+                var output = document.getElementById('terminal-output');
+                output.innerHTML += '\n--- Stopped by user ---\n';
+            }
         });
 }
 
@@ -752,7 +986,6 @@ document.addEventListener('DOMContentLoaded', function() {
         maskCbs[i].addEventListener('change', function() { updateSelectAll(); });
     }
     document.addEventListener('change', function(e) {
-        if (e.target.classList.contains('ansible-feat')) updateAnsibleSelectAll();
         if (e.target.classList.contains('scm-feat')) updateScmSelectAll();
     });
 });
@@ -804,7 +1037,7 @@ document.getElementById('upload-form').addEventListener('submit', function(e) {
             resetUI();
             if (currentMode === 'scm') {
                 currentSessionId = data.session_id || '';
-                showMigrationDashboard(data.dashboard_html, data.ansible_url, data.excel_url, data.session_id);
+                showMigrationDashboard(data.dashboard_html, data.terraform_url, data.excel_url, data.session_id);
             } else {
                 showDashboard(data.dashboard_html, data.excel_url, data.session_id);
             }
@@ -824,8 +1057,6 @@ document.getElementById('upload-form').addEventListener('submit', function(e) {
 
 // ── Deploy to SCM Panel ─────────────────────────────────────
 
-var playbookQueue = [];
-
 function toggleDeployPanel() {
     var body = document.getElementById('deploy-panel-body');
     var icon = document.getElementById('deploy-toggle-icon');
@@ -838,282 +1069,16 @@ function toggleDeployPanel() {
     }
 }
 
-function loadPlaybookList(sessionId) {
-    var select = document.getElementById('playbook-select');
-    select.innerHTML = '<option value="">Loading...</option>';
-    fetch('/playbook-list/' + sessionId)
-        .then(function(r) { return r.json(); })
-        .then(function(data) {
-            select.innerHTML = '<option value="">-- Select a playbook to add --</option>';
-            if (data.playbooks && data.playbooks.length > 0) {
-                var configAll = [], deleteAll = [], configSingle = [], deleteSingle = [];
-                data.playbooks.forEach(function(p) {
-                    if (p === 'configure_all.yml') configAll.push(p);
-                    else if (p === 'delete_all.yml') deleteAll.push(p);
-                    else if (p.startsWith('configure_')) configSingle.push(p);
-                    else if (p.startsWith('delete_')) deleteSingle.push(p);
-                });
-                // Add optgroups
-                if (configAll.length || configSingle.length) {
-                    var grp = document.createElement('optgroup');
-                    grp.label = 'Configure';
-                    configAll.concat(configSingle).forEach(function(p) {
-                        var opt = document.createElement('option');
-                        opt.value = p;
-                        opt.textContent = p.replace('.yml', '').replace(/_/g, ' ');
-                        grp.appendChild(opt);
-                    });
-                    select.appendChild(grp);
-                }
-                if (deleteAll.length || deleteSingle.length) {
-                    var grp2 = document.createElement('optgroup');
-                    grp2.label = 'Delete';
-                    deleteAll.concat(deleteSingle).forEach(function(p) {
-                        var opt = document.createElement('option');
-                        opt.value = p;
-                        opt.textContent = p.replace('.yml', '').replace(/_/g, ' ');
-                        grp2.appendChild(opt);
-                    });
-                    select.appendChild(grp2);
-                }
-            } else {
-                select.innerHTML = '<option value="">No playbooks available</option>';
-            }
-        })
-        .catch(function() {
-            select.innerHTML = '<option value="">Failed to load playbooks</option>';
-        });
-}
-
-function addPlaybookToQueue() {
-    var select = document.getElementById('playbook-select');
-    var val = select.value;
-    if (!val) { alert('Select a playbook from the dropdown first.'); return; }
-    // Allow duplicates (user may want to run the same playbook twice)
-    playbookQueue.push(val);
-    renderPlaybookQueue();
-    select.value = '';
-}
-
-function removeFromQueue(idx) {
-    playbookQueue.splice(idx, 1);
-    renderPlaybookQueue();
-}
-
-function clearPlaybookQueue() {
-    playbookQueue = [];
-    renderPlaybookQueue();
-}
-
-function renderPlaybookQueue() {
-    var container = document.getElementById('playbook-queue');
-    var countEl = document.getElementById('queue-count');
-
-    if (playbookQueue.length === 0) {
-        container.innerHTML = '<div class="playbook-queue-empty">Add playbooks from the dropdown above. They will run in order.</div>';
-        countEl.textContent = '';
-        return;
-    }
-
-    var html = '';
-    playbookQueue.forEach(function(pb, i) {
-        var displayName = pb.replace('.yml', '').replace(/_/g, ' ');
-        html += '<div class="playbook-queue-item" id="queue-item-' + i + '">'
-            + '<span class="queue-num" id="queue-num-' + i + '">' + (i + 1) + '</span>'
-            + '<span class="queue-name">' + escHtml(displayName) + '</span>'
-            + '<span class="queue-status" id="queue-status-' + i + '"></span>'
-            + '<button class="queue-remove" onclick="removeFromQueue(' + i + ')" title="Remove">&times;</button>'
-            + '</div>';
-    });
-    container.innerHTML = html;
-    countEl.textContent = playbookQueue.length + ' playbook' + (playbookQueue.length > 1 ? 's' : '') + ' queued';
-}
-
 function colorizeOutput(text) {
-    if (/^(PLAY|TASK|PLAY RECAP)/.test(text)) return '<span class="task-header">' + escHtml(text) + '</span>';
-    if (/^ok:/.test(text)) return '<span class="task-ok">' + escHtml(text) + '</span>';
-    if (/^changed:/.test(text)) return '<span class="task-changed">' + escHtml(text) + '</span>';
-    if (/^(fatal|failed|ERROR)/.test(text)) return '<span class="task-failed">' + escHtml(text) + '</span>';
+    if (/^(Plan:|Apply|Destroy|Initializing)/.test(text)) return '<span class="task-header">' + escHtml(text) + '</span>';
+    if (/created|added|Success/.test(text)) return '<span class="task-ok">' + escHtml(text) + '</span>';
+    if (/modified|changed|updated/.test(text)) return '<span class="task-changed">' + escHtml(text) + '</span>';
+    if (/Error|destroyed|failed|ERROR/.test(text)) return '<span class="task-failed">' + escHtml(text) + '</span>';
     return escHtml(text);
 }
 
 function escHtml(t) {
     return t.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
-}
-
-function updateQueueItemStatus(index, statusClass, statusText) {
-    var numEl = document.getElementById('queue-num-' + index);
-    var statusEl = document.getElementById('queue-status-' + index);
-    if (numEl) numEl.className = 'queue-num ' + statusClass;
-    if (statusEl) {
-        statusEl.textContent = statusText;
-        statusEl.style.color = statusClass === 'running' ? 'var(--panw-orange)'
-            : statusClass === 'done' ? 'var(--accent-teal)'
-            : statusClass === 'failed' ? 'var(--danger)' : '';
-    }
-    // Disable remove buttons while running
-    var removeBtn = document.querySelector('#queue-item-' + index + ' .queue-remove');
-    if (removeBtn) removeBtn.style.display = statusClass === 'running' ? 'none' : '';
-}
-
-function runPlaybook() {
-    if (playbookQueue.length === 0) { alert('Add at least one playbook to the queue.'); return; }
-
-    var clientId = document.getElementById('deploy-client-id').value.trim();
-    var clientSecret = document.getElementById('deploy-client-secret').value.trim();
-    var tsgId = document.getElementById('deploy-tsg-id').value.trim();
-    if (!clientId || !clientSecret || !tsgId) {
-        alert('All SCM credentials (Client ID, Client Secret, TSG ID) are required to deploy.');
-        return;
-    }
-
-    var wrapper = document.getElementById('terminal-wrapper');
-    var output = document.getElementById('terminal-output');
-    var status = document.getElementById('run-status');
-    var runBtn = document.getElementById('run-btn');
-    var stopBtn = document.getElementById('stop-btn');
-
-    wrapper.style.display = '';
-    output.innerHTML = '';
-    var queueLabel = playbookQueue.length === 1 ? playbookQueue[0] : playbookQueue.length + ' playbooks';
-    document.getElementById('terminal-title').textContent = '$ Running ' + queueLabel;
-    status.className = 'run-status running';
-    status.textContent = 'Running 1/' + playbookQueue.length;
-    runBtn.disabled = true;
-    stopBtn.style.display = '';
-
-    // Disable remove buttons on all queue items
-    document.querySelectorAll('.queue-remove').forEach(function(btn) { btn.style.display = 'none'; });
-
-    fetch('/run-playbook/' + currentSessionId, {
-        method: 'POST',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({
-            playbooks: playbookQueue.slice(),
-            credentials: { client_id: clientId, client_secret: clientSecret, tsg_id: tsgId }
-        })
-    }).then(function(response) {
-        if (!response.ok) {
-            return response.json().then(function(data) {
-                throw new Error(data.error || 'Request failed');
-            });
-        }
-        var reader = response.body.getReader();
-        var decoder = new TextDecoder();
-        var buffer = '';
-
-        function processChunk(result) {
-            if (result.done) {
-                if (buffer.trim()) processSSEBuffer(buffer, output, status, runBtn, stopBtn);
-                if (status.textContent.indexOf('Running') === 0) {
-                    status.className = 'run-status success';
-                    status.textContent = 'Complete';
-                    runBtn.disabled = false;
-                    stopBtn.style.display = 'none';
-                }
-                return;
-            }
-            buffer += decoder.decode(result.value, {stream: true});
-            var parts = buffer.split('\n\n');
-            buffer = parts.pop();
-            parts.forEach(function(part) {
-                processSSEMessage(part.trim(), output, status, runBtn, stopBtn);
-            });
-            return reader.read().then(processChunk);
-        }
-
-        return reader.read().then(processChunk);
-    }).catch(function(err) {
-        output.innerHTML += '<span class="task-failed">Error: ' + escHtml(err.message) + '</span>\n';
-        status.className = 'run-status failed';
-        status.textContent = 'Failed';
-        runBtn.disabled = false;
-        stopBtn.style.display = 'none';
-        document.querySelectorAll('.queue-remove').forEach(function(btn) { btn.style.display = ''; });
-    });
-}
-
-function processSSEBuffer(buf, output, status, runBtn, stopBtn) {
-    buf.split('\n\n').forEach(function(part) {
-        if (part.trim()) processSSEMessage(part.trim(), output, status, runBtn, stopBtn);
-    });
-}
-
-function processSSEMessage(msg, output, status, runBtn, stopBtn) {
-    if (!msg) return;
-    var lines = msg.split('\n');
-    var eventType = 'message';
-    var dataStr = '';
-    lines.forEach(function(line) {
-        if (line.startsWith('event: ')) eventType = line.substring(7);
-        else if (line.startsWith('data: ')) dataStr = line.substring(6);
-    });
-
-    if (eventType === 'playbook_start') {
-        try {
-            var info = JSON.parse(dataStr);
-            var displayName = info.playbook.replace('.yml', '').replace(/_/g, ' ');
-            output.innerHTML += '\n<span class="task-header">━━━ [' + info.index + '/' + info.total + '] ' + displayName + ' ━━━</span>\n\n';
-            output.scrollTop = output.scrollHeight;
-            status.textContent = 'Running ' + info.index + '/' + info.total;
-            updateQueueItemStatus(info.index - 1, 'running', 'Running...');
-        } catch(e) {}
-    } else if (eventType === 'playbook_end') {
-        try {
-            var info = JSON.parse(dataStr);
-            if (info.exit_code === 0) {
-                updateQueueItemStatus(info.index - 1, 'done', 'Success');
-                output.innerHTML += '<span class="task-ok">Completed: ' + escHtml(info.playbook) + '</span>\n';
-            } else {
-                updateQueueItemStatus(info.index - 1, 'failed', 'Failed');
-                output.innerHTML += '<span class="task-failed">Failed: ' + escHtml(info.playbook) + ' (exit ' + info.exit_code + ')</span>\n';
-            }
-            output.scrollTop = output.scrollHeight;
-        } catch(e) {}
-    } else if (eventType === 'done') {
-        try {
-            var result = JSON.parse(dataStr);
-            var exitCode = result.exit_code;
-            if (exitCode === 0) {
-                status.className = 'run-status success';
-                status.textContent = 'All Completed';
-                output.innerHTML += '\n<span class="task-ok">All ' + playbookQueue.length + ' playbook(s) completed successfully</span>\n';
-            } else {
-                status.className = 'run-status failed';
-                var failMsg = result.stopped_at ? 'Failed at ' + result.stopped_at : 'Failed (exit ' + exitCode + ')';
-                status.textContent = failMsg;
-                output.innerHTML += '\n<span class="task-failed">' + escHtml(failMsg) + '</span>\n';
-            }
-        } catch(e) {
-            status.className = 'run-status failed';
-            status.textContent = 'Failed';
-        }
-        runBtn.disabled = false;
-        stopBtn.style.display = 'none';
-        document.querySelectorAll('.queue-remove').forEach(function(btn) { btn.style.display = ''; });
-    } else {
-        try {
-            var text = JSON.parse(dataStr);
-            output.innerHTML += colorizeOutput(text) + '\n';
-            output.scrollTop = output.scrollHeight;
-        } catch(e) {}
-    }
-}
-
-function stopPlaybook() {
-    if (!currentSessionId) return;
-    fetch('/stop-playbook/' + currentSessionId, { method: 'POST' })
-        .then(function(r) { return r.json(); })
-        .then(function(data) {
-            var status = document.getElementById('run-status');
-            var output = document.getElementById('terminal-output');
-            status.className = 'run-status failed';
-            status.textContent = 'Stopped';
-            output.innerHTML += '\n<span class="task-failed">Playbook execution stopped by user</span>\n';
-            document.getElementById('run-btn').disabled = false;
-            document.getElementById('stop-btn').style.display = 'none';
-            document.querySelectorAll('.queue-remove').forEach(function(btn) { btn.style.display = ''; });
-        });
 }
 
 // ── Sizing Calculator ────────────────────────────────────────
@@ -1254,6 +1219,200 @@ function showSizingDashboard(html, excelUrl) {
     document.getElementById('sizing-dashboard-content').innerHTML = html;
     document.getElementById('sizing-excel-btn').href = excelUrl;
     document.getElementById('sizing-results-section').style.display = '';
+    window.scrollTo(0, 0);
+}
+
+// ── POC Config Generator ──────────────────────────────────────
+
+var pocDeviceCounters = { hub: 0, branch: 0 };
+var pocLinkCounters = { hub: 0, branch: 0 };
+var pocRuleCounter = 0;
+var pocZoneCounter = 0;
+
+function initPocForm() {
+    // Reset and add default rows
+    pocDeviceCounters = { hub: 0, branch: 0 };
+    pocLinkCounters = { hub: 0, branch: 0 };
+    pocRuleCounter = 0;
+    pocZoneCounter = 0;
+    document.getElementById('poc-hub-devices').innerHTML = '';
+    document.getElementById('poc-branch-devices').innerHTML = '';
+    document.getElementById('poc-hub-links').innerHTML = '';
+    document.getElementById('poc-branch-links').innerHTML = '';
+    document.getElementById('poc-zones').innerHTML = '';
+    document.getElementById('poc-custom-rules').innerHTML = '';
+    // Add starter rows (empty, user fills in)
+    addPocDevice('hub');
+    addPocDevice('branch');
+    addPocDevice('branch');
+    addPocLink('hub');
+    addPocLink('hub');
+    addPocLink('branch');
+    addPocZone();
+    addPocZone();
+}
+
+function addPocDevice(role) {
+    var idx = pocDeviceCounters[role]++;
+    var container = document.getElementById('poc-' + role + '-devices');
+    var row = document.createElement('div');
+    row.className = 'poc-device-block';
+    row.id = 'poc-' + role + '-dev-' + idx;
+    var serialHint = role === 'hub' ? 'e.g. 0123456789' : 'e.g. 9876543210';
+    var nameHint = role === 'hub' ? 'e.g. DC-Hub-01' : 'e.g. Branch-NYC-01';
+    var siteHint = role === 'hub' ? 'e.g. Datacenter-East' : 'e.g. New-York-Office';
+    var asHint = role === 'hub' ? 'e.g. 65000' : 'e.g. 65001';
+    var ridHint = role === 'hub' ? 'e.g. 10.0.0.1' : 'e.g. 10.1.0.1';
+    var loHint = role === 'hub' ? 'e.g. 10.255.0.1/32' : 'e.g. 10.255.1.1/32';
+    var lrHint = role === 'hub' ? 'e.g. Hub-LR-01' : 'e.g. Branch-LR-01';
+    row.innerHTML =
+        '<div class="poc-device-block-header">' +
+            '<span class="poc-device-block-label">' + (role === 'hub' ? 'Hub' : 'Branch') + ' ' + (idx + 1) + '</span>' +
+            '<button type="button" class="poc-remove-btn" onclick="this.closest(\'.poc-device-block\').remove()">&times;</button>' +
+        '</div>' +
+        '<div class="poc-dynamic-row">' +
+            '<div class="poc-labeled-field"><label>Serial</label><input type="text" name="poc_' + role + '_serial_' + idx + '" placeholder="' + serialHint + '"></div>' +
+            '<div class="poc-labeled-field"><label>Name</label><input type="text" name="poc_' + role + '_name_' + idx + '" placeholder="' + nameHint + '"></div>' +
+            '<div class="poc-labeled-field"><label>Site</label><input type="text" name="poc_' + role + '_site_' + idx + '" placeholder="' + siteHint + '"></div>' +
+        '</div>' +
+        '<div class="poc-dynamic-row">' +
+            '<div class="poc-labeled-field"><label>AS Number</label><input type="text" name="poc_' + role + '_as_' + idx + '" placeholder="' + asHint + '"></div>' +
+            '<div class="poc-labeled-field"><label>Router ID</label><input type="text" name="poc_' + role + '_rid_' + idx + '" placeholder="' + ridHint + '"></div>' +
+            '<div class="poc-labeled-field"><label>Loopback</label><input type="text" name="poc_' + role + '_loopback_' + idx + '" placeholder="' + loHint + '"></div>' +
+            '<div class="poc-labeled-field"><label>Logical Router</label><input type="text" name="poc_' + role + '_lr_' + idx + '" placeholder="' + lrHint + '"></div>' +
+        '</div>';
+    container.appendChild(row);
+}
+
+function addPocLink(role) {
+    var idx = pocLinkCounters[role]++;
+    var container = document.getElementById('poc-' + role + '-links');
+    var row = document.createElement('div');
+    row.className = 'poc-link-block';
+    row.id = 'poc-' + role + '-link-' + idx;
+    var nameHint = role === 'hub' ? 'e.g. Hub-ISP-Public-1' : 'e.g. Branch-ISP-Public-1';
+    var bwHint = role === 'hub' ? 'e.g. 500' : 'e.g. 100';
+    row.innerHTML =
+        '<div class="poc-link-block-header">' +
+            '<span class="poc-link-block-label">' + (role === 'hub' ? 'Hub' : 'Branch') + ' Profile ' + (idx + 1) + '</span>' +
+            '<button type="button" class="poc-remove-btn" onclick="this.closest(\'.poc-link-block\').remove()">&times;</button>' +
+        '</div>' +
+        '<div class="poc-dynamic-row">' +
+            '<div class="poc-labeled-field"><label>Profile Name</label><input type="text" name="poc_' + role + '_link_name_' + idx + '" placeholder="' + nameHint + '"></div>' +
+            '<div class="poc-labeled-field"><label>Link Type</label><select name="poc_' + role + '_link_type_' + idx + '">' +
+                '<option value="" disabled selected>Select type</option>' +
+                '<option value="public">Public (Internet)</option>' +
+                '<option value="private">Private (MPLS)</option>' +
+            '</select></div>' +
+            '<div class="poc-labeled-field"><label>Bandwidth (Mbps)</label><input type="number" name="poc_' + role + '_link_bw_' + idx + '" placeholder="' + bwHint + '" min="1"></div>' +
+        '</div>';
+    container.appendChild(row);
+}
+
+function addPocZone() {
+    var idx = pocZoneCounter++;
+    var container = document.getElementById('poc-zones');
+    var row = document.createElement('div');
+    row.className = 'poc-link-block';
+    row.id = 'poc-zone-' + idx;
+    row.innerHTML =
+        '<div class="poc-link-block-header">' +
+            '<span class="poc-link-block-label">Zone ' + (idx + 1) + '</span>' +
+            '<button type="button" class="poc-remove-btn" onclick="this.closest(\'.poc-link-block\').remove()">&times;</button>' +
+        '</div>' +
+        '<div class="poc-dynamic-row">' +
+            '<div class="poc-labeled-field"><label>Zone Name</label><input type="text" name="poc_zone_name_' + idx + '" placeholder="e.g. trust"></div>' +
+            '<div class="poc-labeled-field"><label>Zone Type</label><select name="poc_zone_type_' + idx + '">' +
+                '<option value="layer3" selected>Layer3</option>' +
+                '<option value="layer2">Layer2</option>' +
+                '<option value="virtual-wire">Virtual Wire</option>' +
+                '<option value="tap">Tap</option>' +
+            '</select></div>' +
+        '</div>';
+    container.appendChild(row);
+}
+
+function addPocRule() {
+    var idx = pocRuleCounter++;
+    var container = document.getElementById('poc-custom-rules');
+    var row = document.createElement('div');
+    row.className = 'poc-dynamic-row';
+    row.innerHTML =
+        '<input type="text" name="poc_rule_name_' + idx + '" placeholder="e.g. Allow-VoiceVideo">' +
+        '<input type="text" name="poc_rule_apps_' + idx + '" placeholder="e.g. ms-teams, zoom, webex">' +
+        '<button type="button" class="poc-remove-btn" onclick="this.parentElement.remove()">&times;</button>';
+    container.appendChild(row);
+}
+
+function togglePocPolicySection() {
+    var enabled = document.getElementById('poc-policy-enabled').checked;
+    document.getElementById('poc-policy-section').style.display = enabled ? '' : 'none';
+}
+
+function togglePocCustomRules() {
+    var sel = document.getElementById('poc-policy-template');
+    document.getElementById('poc-custom-rules-section').style.display =
+        sel.value === 'custom' ? '' : 'none';
+}
+
+function submitPoc(e) {
+    e.preventDefault();
+    var btn = document.getElementById('poc-submit-btn');
+    btn.disabled = true;
+    btn.textContent = 'Generating...';
+    document.getElementById('poc-spinner').style.display = 'flex';
+
+    var formData = new FormData(document.getElementById('poc-form'));
+    // Add fields that aren't in named inputs
+    formData.set('panorama_ip', document.getElementById('poc-panorama-ip').value);
+    formData.set('template_name', document.getElementById('poc-template').value);
+    formData.set('device_group', document.getElementById('poc-device-group').value);
+    formData.set('topology_type', document.getElementById('poc-topology').value);
+    formData.set('cluster_name', document.getElementById('poc-cluster-name').value);
+    formData.set('vpn_address_pool', document.getElementById('poc-vpn-pool').value);
+    formData.set('probe_frequency', document.getElementById('poc-probe-freq').value);
+    formData.set('probe_idle_time', document.getElementById('poc-probe-idle').value);
+    formData.set('failback_hold_time', document.getElementById('poc-failback').value);
+    formData.set('td_method', document.getElementById('poc-td-method').value);
+    formData.set('fec_enabled', document.getElementById('poc-fec').checked ? 'yes' : 'no');
+    formData.set('latency_threshold', document.getElementById('poc-latency').value);
+    formData.set('latency_sensitivity', document.getElementById('poc-latency-sens').value);
+    formData.set('jitter_threshold', document.getElementById('poc-jitter').value);
+    formData.set('jitter_sensitivity', document.getElementById('poc-jitter-sens').value);
+    formData.set('pkt_loss_threshold', document.getElementById('poc-pktloss').value);
+    formData.set('pkt_loss_sensitivity', document.getElementById('poc-pktloss-sens').value);
+    var policyEnabled = document.getElementById('poc-policy-enabled').checked;
+    formData.set('policy_enabled', policyEnabled ? 'yes' : 'no');
+    if (policyEnabled) {
+        formData.set('policy_template', document.getElementById('poc-policy-template').value);
+    }
+
+    fetch('/generate-poc', { method: 'POST', body: formData })
+        .then(function(resp) { return resp.json(); })
+        .then(function(data) {
+            btn.disabled = false;
+            btn.textContent = 'Generate POC Playbooks';
+            document.getElementById('poc-spinner').style.display = 'none';
+            if (data.error) {
+                alert('Error: ' + data.error);
+                return;
+            }
+            showPocDashboard(data.dashboard_html, data.ansible_url);
+        })
+        .catch(function(err) {
+            btn.disabled = false;
+            btn.textContent = 'Generate POC Playbooks';
+            document.getElementById('poc-spinner').style.display = 'none';
+            alert('Error: ' + err.message);
+        });
+}
+
+function showPocDashboard(html, ansibleUrl) {
+    document.getElementById('poc-form-section').style.display = 'none';
+    document.getElementById('main-footer').style.display = 'none';
+    document.getElementById('poc-dashboard-content').innerHTML = html;
+    document.getElementById('poc-ansible-btn').href = ansibleUrl;
+    document.getElementById('poc-results-section').style.display = '';
     window.scrollTo(0, 0);
 }
 </script>

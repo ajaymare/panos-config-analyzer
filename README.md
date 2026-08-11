@@ -1,6 +1,6 @@
 # PAN-OS SD-WAN Toolkit
 
-Docker-based web application for Palo Alto Networks SD-WAN professionals. Three integrated tools: Configuration Analysis with deployment scoring, SCM Migration with Ansible playbook generation, and Firewall Sizing Calculator with hardware and VM-Series recommendations.
+Docker-based web application for Palo Alto Networks SD-WAN professionals. Three integrated tools: Configuration Analysis with deployment scoring, SCM Migration with Terraform HCL generation, and Firewall Sizing Calculator with hardware and VM-Series recommendations.
 
 ## Three Modes
 
@@ -15,13 +15,14 @@ Upload Panorama or NGFW XML configs to generate deployment reports with maturity
 - PAN-OS and SD-WAN plugin version extraction
 - Sensitive data masking (IPs, hostnames, devices, passwords, certs, networks)
 
-### 2. SCM Migration
-Convert PAN-OS SD-WAN configurations to SCM-compatible Ansible playbooks for automated migration to Strata Cloud Manager.
+### 2. Generate SCM Config
+Convert PAN-OS SD-WAN configurations to Terraform HCL targeting the `paloaltonetworks/scm` provider for deployment to Strata Cloud Manager.
 
 - Migration readiness analysis with feature-by-feature compatibility
-- Ansible playbook generation (configure + delete) for 15 SD-WAN object types
-- Direct deploy-to-SCM from the web UI with playbook queue and live terminal output
+- Terraform HCL generation for 15 SD-WAN object types using the SCM Terraform provider
+- Direct deploy-to-SCM from the web UI: `terraform init`, `plan`, `apply`, `destroy` with live terminal output
 - Migration report with supported/unsupported feature breakdown
+- Generated `.tf` files: provider config, variables, per-feature resource definitions, outputs
 
 ### 3. Sizing Calculator
 Input site requirements and get PA firewall model recommendations for SD-WAN deployments.
@@ -73,7 +74,7 @@ docker run -d --name panos-sdwan-toolkit -p 8080:8080 -p 9443:9443 ajaymare/pano
 |--------|--------|------|
 | PA-400 | PA-440, PA-450, PA-460 | Branch |
 | PA-800 | PA-820, PA-850 | Branch |
-| PA-1400 | PA-1420, PA-1430 | Branch / Hub |
+| PA-1400 | PA-1410, PA-1420 | Branch / Hub |
 | PA-3400 | PA-3410, PA-3420, PA-3430, PA-3440 | Hub |
 | PA-5400 | PA-5410, PA-5420, PA-5430, PA-5440 | Hub |
 | PA-7000 | PA-7050, PA-7080 | Hub |
@@ -120,7 +121,7 @@ docker run -d --name panos-sdwan-toolkit -p 8080:8080 -p 9443:9443 ajaymare/pano
 1. Select "Generate SCM Config" on the landing page
 2. Upload Panorama XML config
 3. Select SD-WAN objects to migrate
-4. Review migration dashboard, download Ansible playbooks, or deploy directly to SCM
+4. Review migration dashboard, download Terraform config, or deploy directly to SCM via `terraform apply`
 
 ### Sizing Calculator
 
@@ -154,7 +155,7 @@ parser/
 │   └── styles.py              # Excel cell formatting
 ├── scm/
 │   ├── mapper.py              # PAN-OS to SCM config mapping
-│   ├── ansible_generator.py   # Ansible playbook generation
+│   ├── terraform_generator.py # Terraform HCL generation (paloaltonetworks/scm provider)
 │   └── migration_report.py    # Migration report generation
 ├── sizing/
 │   ├── models.py              # PA + VM-Series specs, licensing data
@@ -178,7 +179,7 @@ parser/
 - Flask, gunicorn -- Web framework and WSGI server
 - openpyxl -- Excel report generation
 - lxml -- XML parsing
-- PyYAML -- Ansible playbook generation
+- PyYAML -- YAML serialization
 - chromadb -- Vector store for datasheet RAG
 - pdfplumber -- PDF text extraction
 - duckduckgo-search -- Datasheet URL discovery
