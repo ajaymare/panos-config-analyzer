@@ -14,12 +14,19 @@ def generate_poc_dashboard(inputs: dict, summary: dict) -> str:
     device_group = summary.get('device_group', 'POC-DeviceGroup')
     active_roles = summary.get('active_roles', [])
     role_items = summary.get('role_items', {})
+    target = summary.get('target', 'panorama')
+    is_scm = target == 'scm'
 
     html = '<div class="sizing-dashboard">'
 
     # --- Summary Banner ---
+    target_label = 'SCM (Terraform)' if is_scm else 'Panorama (Ansible)'
     html += f'''
     <div class="sizing-summary-banner">
+        <div class="sizing-summary-item">
+            <div class="sizing-summary-value">{escape(target_label)}</div>
+            <div class="sizing-summary-label">Target</div>
+        </div>
         <div class="sizing-summary-item">
             <div class="sizing-summary-value">{escape(topology.replace("-", " ").title())}</div>
             <div class="sizing-summary-label">Topology</div>
@@ -43,33 +50,62 @@ def generate_poc_dashboard(inputs: dict, summary: dict) -> str:
     </div>
     '''
 
-    # --- Panorama Target ---
-    html += f'''
-    <div class="sizing-card" style="margin-bottom: 16px;">
-        <div class="sizing-card-header" style="background: #1a3a5c;">
-            <div style="display: flex; align-items: center; gap: 10px;">
-                <span style="font-size: 20px;">&#9881;</span>
-                <span>Panorama Configuration Target</span>
-            </div>
-        </div>
-        <div class="sizing-card-body">
-            <div class="sizing-specs-grid">
-                <div class="sizing-spec-row">
-                    <span class="sizing-spec-label">Template</span>
-                    <span class="sizing-spec-value">{escape(template_name)}</span>
-                </div>
-                <div class="sizing-spec-row">
-                    <span class="sizing-spec-label">Device Group</span>
-                    <span class="sizing-spec-value">{escape(device_group)}</span>
-                </div>
-                <div class="sizing-spec-row">
-                    <span class="sizing-spec-label">Panorama IP</span>
-                    <span class="sizing-spec-value">{escape(inputs.get('panorama_ip', 'Set in credentials'))}</span>
+    # --- Target Details ---
+    if is_scm:
+        scm_folder = summary.get('scm_folder', inputs.get('scm_folder', 'Remote Networks'))
+        html += f'''
+        <div class="sizing-card" style="margin-bottom: 16px;">
+            <div class="sizing-card-header" style="background: #1a3a5c;">
+                <div style="display: flex; align-items: center; gap: 10px;">
+                    <span style="font-size: 20px;">&#9881;</span>
+                    <span>Strata Cloud Manager Target</span>
                 </div>
             </div>
+            <div class="sizing-card-body">
+                <div class="sizing-specs-grid">
+                    <div class="sizing-spec-row">
+                        <span class="sizing-spec-label">Platform</span>
+                        <span class="sizing-spec-value">SCM (Terraform)</span>
+                    </div>
+                    <div class="sizing-spec-row">
+                        <span class="sizing-spec-label">Provider</span>
+                        <span class="sizing-spec-value">paloaltonetworks/scm</span>
+                    </div>
+                    <div class="sizing-spec-row">
+                        <span class="sizing-spec-label">Folder</span>
+                        <span class="sizing-spec-value">{escape(scm_folder)}</span>
+                    </div>
+                </div>
+            </div>
         </div>
-    </div>
-    '''
+        '''
+    else:
+        html += f'''
+        <div class="sizing-card" style="margin-bottom: 16px;">
+            <div class="sizing-card-header" style="background: #1a3a5c;">
+                <div style="display: flex; align-items: center; gap: 10px;">
+                    <span style="font-size: 20px;">&#9881;</span>
+                    <span>Panorama Configuration Target</span>
+                </div>
+            </div>
+            <div class="sizing-card-body">
+                <div class="sizing-specs-grid">
+                    <div class="sizing-spec-row">
+                        <span class="sizing-spec-label">Template</span>
+                        <span class="sizing-spec-value">{escape(template_name)}</span>
+                    </div>
+                    <div class="sizing-spec-row">
+                        <span class="sizing-spec-label">Device Group</span>
+                        <span class="sizing-spec-value">{escape(device_group)}</span>
+                    </div>
+                    <div class="sizing-spec-row">
+                        <span class="sizing-spec-label">Panorama IP</span>
+                        <span class="sizing-spec-value">{escape(inputs.get('panorama_ip', 'Set in credentials'))}</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+        '''
 
     # --- Feature Cards ---
     html += '<div class="sizing-cards-grid">'
@@ -118,8 +154,57 @@ def generate_poc_dashboard(inputs: dict, summary: dict) -> str:
 
     html += '</div>'  # sizing-cards-grid
 
-    # --- Playbook Summary Table ---
-    html += '''
+    # --- File Summary Table ---
+    if is_scm:
+        html += '''
+    <div class="sizing-card" style="margin-top: 16px;">
+        <div class="sizing-card-header" style="background: #1a3a5c;">
+            <div style="display: flex; align-items: center; gap: 10px;">
+                <span style="font-size: 18px;">&#128230;</span>
+                <span>Generated Terraform Files</span>
+            </div>
+        </div>
+        <div class="sizing-card-body" style="padding: 0;">
+            <table class="sizing-table" style="margin: 0;">
+                <thead>
+                    <tr><th>File</th><th>Contents</th><th>Resources</th></tr>
+                </thead>
+                <tbody>
+        '''
+        tf_file_map = {
+            'zones': ('zones.tf', 'Security Zones'),
+            'path_quality': ('path_quality.tf', 'Path Quality Profiles'),
+            'traffic_distribution': ('traffic_distribution.tf', 'Traffic Distribution Profiles'),
+            'sdwan_policies': ('sdwan_rules.tf', 'SD-WAN Policy Rules'),
+        }
+        for role_key, display_name in active_roles:
+            count = role_items.get(role_key, 0)
+            tf_info = tf_file_map.get(role_key, (f'{role_key}.tf', display_name))
+            html += f'''
+                    <tr>
+                        <td><code>{escape(tf_info[0])}</code></td>
+                        <td>{escape(tf_info[1])}</td>
+                        <td>{count}</td>
+                    </tr>
+            '''
+        html += f'''
+                    <tr style="background: #f0f4f8;">
+                        <td><code>provider.tf</code></td>
+                        <td>SCM Provider Configuration</td>
+                        <td>-</td>
+                    </tr>
+                    <tr style="background: #f0f4f8;">
+                        <td><code>variables.tf</code></td>
+                        <td>Input Variables</td>
+                        <td>-</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+        '''
+    else:
+        html += '''
     <div class="sizing-card" style="margin-top: 16px;">
         <div class="sizing-card-header" style="background: #1a3a5c;">
             <div style="display: flex; align-items: center; gap: 10px;">
@@ -133,35 +218,65 @@ def generate_poc_dashboard(inputs: dict, summary: dict) -> str:
                     <tr><th>Playbook</th><th>Feature</th><th>Elements</th></tr>
                 </thead>
                 <tbody>
-    '''
-
-    html += f'''
+        '''
+        html += f'''
                     <tr style="background: #f0f4f8; font-weight: 600;">
                         <td>configure_all.yml</td>
                         <td>All Features + Commit</td>
                         <td>{total_elements}</td>
                     </tr>
-    '''
-
-    for role_key, display_name in active_roles:
-        count = role_items.get(role_key, 0)
-        html += f'''
+        '''
+        for role_key, display_name in active_roles:
+            count = role_items.get(role_key, 0)
+            html += f'''
                     <tr>
                         <td><code>configure_{escape(role_key)}.yml</code></td>
                         <td>{escape(display_name)}</td>
                         <td>{count}</td>
                     </tr>
-        '''
-
-    html += '''
+            '''
+        html += '''
                 </tbody>
             </table>
         </div>
     </div>
-    '''
+        '''
 
     # --- Quick Start Guide ---
-    html += '''
+    if is_scm:
+        html += '''
+    <div class="sizing-card" style="margin-top: 16px;">
+        <div class="sizing-card-header" style="background: #2e86c1;">
+            <div style="display: flex; align-items: center; gap: 10px;">
+                <span style="font-size: 18px;">&#9889;</span>
+                <span>Quick Start</span>
+            </div>
+        </div>
+        <div class="sizing-card-body">
+            <div style="font-size: 13px; line-height: 1.8;">
+                <strong>1.</strong> Download and extract the Terraform ZIP<br>
+                <strong>2.</strong> Edit credentials:
+                <code style="background: #f0f4f8; padding: 2px 6px; border-radius: 3px;">
+                    vi terraform.tfvars
+                </code><br>
+                <strong>3.</strong> Initialize Terraform:
+                <code style="background: #f0f4f8; padding: 2px 6px; border-radius: 3px;">
+                    terraform init
+                </code><br>
+                <strong>4.</strong> Review the plan:
+                <code style="background: #f0f4f8; padding: 2px 6px; border-radius: 3px;">
+                    terraform plan
+                </code><br>
+                <strong>5.</strong> Apply the configuration:
+                <code style="background: #f0f4f8; padding: 2px 6px; border-radius: 3px;">
+                    terraform apply
+                </code>
+            </div>
+        </div>
+    </div>
+        '''
+    else:
+        html += '''
     <div class="sizing-card" style="margin-top: 16px;">
         <div class="sizing-card-header" style="background: #2e86c1;">
             <div style="display: flex; align-items: center; gap: 10px;">
@@ -187,7 +302,7 @@ def generate_poc_dashboard(inputs: dict, summary: dict) -> str:
             </div>
         </div>
     </div>
-    '''
+        '''
 
     html += '</div>'  # sizing-dashboard
     return html

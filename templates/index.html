@@ -29,12 +29,17 @@
         <div class="mode-card" onclick="selectMode('sizing')">
             <div class="mode-icon">&#128290;</div>
             <h3>Sizing Calculator</h3>
-            <p>Get PA firewall sizing recommendations for SD-WAN deployments based on bandwidth, sessions, tunnels, and security requirements</p>
+            <p>Get PA firewall sizing recommendations for SD-WAN deployments based on throughput, tunnels, topology, and security requirements</p>
         </div>
         <div class="mode-card" onclick="selectMode('poc')">
             <div class="mode-icon">&#9889;</div>
             <h3>POC Config Generator</h3>
-            <p>Generate Ansible playbooks to configure PAN-OS SD-WAN on Panorama — interface profiles, VPN topology, policies, and routing</p>
+            <p>Generate Ansible playbooks (Panorama) or Terraform HCL (SCM) for SD-WAN POC — profiles, policies, zones, and routing</p>
+        </div>
+        <div class="mode-card" onclick="selectMode('advisor')">
+            <div class="mode-icon">&#128161;</div>
+            <h3>SD-WAN Advisor</h3>
+            <p>PAN-OS SD-WAN vs Prisma SD-WAN — get a data-driven recommendation based on customer requirements, security needs, and competitive landscape</p>
         </div>
     </div>
 </div>
@@ -239,6 +244,14 @@
                         <input type="number" name="num_branches" id="sz-num-branches" min="1" value="10" required>
                     </div>
                     <div class="form-group">
+                        <label>VPN Topology</label>
+                        <select name="topology" id="sz-topology">
+                            <option value="hub-spoke" selected>Hub &amp; Spoke</option>
+                            <option value="full-mesh">Full Mesh</option>
+                        </select>
+                        <span class="input-hint" id="sz-topology-hint">Tunnels between hubs and branches only</span>
+                    </div>
+                    <div class="form-group">
                         <label>VM-Series</label>
                         <label class="sizing-vm-toggle-row">
                             <div class="toggle-switch">
@@ -312,7 +325,7 @@
                 <div class="sizing-section-title">Hub Site Requirements</div>
                 <div class="sizing-input-grid">
                     <div class="form-group">
-                        <label>Hub Bandwidth (Mbps)</label>
+                        <label>Hub Throughput (Mbps)</label>
                         <select name="hub_bandwidth_mbps" id="sz-hub-bw">
                             <option value="100">100 Mbps</option>
                             <option value="200">200 Mbps</option>
@@ -326,20 +339,6 @@
                             <option value="custom">Custom...</option>
                         </select>
                         <input type="number" id="sz-hub-bw-custom" style="display:none; margin-top:6px;" placeholder="Enter Mbps" min="1">
-                    </div>
-                    <div class="form-group">
-                        <label>Hub Concurrent Sessions</label>
-                        <select name="hub_sessions" id="sz-hub-sessions">
-                            <option value="100000">100,000</option>
-                            <option value="200000">200,000</option>
-                            <option value="500000" selected>500,000</option>
-                            <option value="1000000">1,000,000</option>
-                            <option value="2000000">2,000,000</option>
-                            <option value="5000000">5,000,000</option>
-                            <option value="10000000">10,000,000</option>
-                            <option value="custom">Custom...</option>
-                        </select>
-                        <input type="number" id="sz-hub-sessions-custom" style="display:none; margin-top:6px;" placeholder="Enter count" min="1">
                     </div>
                     <div class="form-group">
                         <label>Hub HA (High Availability)</label>
@@ -372,7 +371,7 @@
                 <div class="sizing-section-title">Branch Site Requirements (per site)</div>
                 <div class="sizing-input-grid">
                     <div class="form-group">
-                        <label>Branch Bandwidth (Mbps)</label>
+                        <label>Branch Throughput (Mbps)</label>
                         <select name="branch_bandwidth_mbps" id="sz-branch-bw">
                             <option value="20">20 Mbps</option>
                             <option value="50">50 Mbps</option>
@@ -385,19 +384,6 @@
                             <option value="custom">Custom...</option>
                         </select>
                         <input type="number" id="sz-branch-bw-custom" style="display:none; margin-top:6px;" placeholder="Enter Mbps" min="1">
-                    </div>
-                    <div class="form-group">
-                        <label>Branch Concurrent Sessions</label>
-                        <select name="branch_sessions" id="sz-branch-sessions">
-                            <option value="10000">10,000</option>
-                            <option value="25000">25,000</option>
-                            <option value="50000" selected>50,000</option>
-                            <option value="100000">100,000</option>
-                            <option value="200000">200,000</option>
-                            <option value="500000">500,000</option>
-                            <option value="custom">Custom...</option>
-                        </select>
-                        <input type="number" id="sz-branch-sessions-custom" style="display:none; margin-top:6px;" placeholder="Enter count" min="1">
                     </div>
                     <div class="form-group">
                         <label>Branches with HA</label>
@@ -459,213 +445,189 @@
 </div>
 
 <!-- POC Config Generator Form -->
+<!-- POC Wizard -->
 <div class="container" id="poc-form-section" style="display:none;">
     <div style="margin-bottom:12px;">
         <button class="btn-back" onclick="showLanding()">&larr; Back</button>
     </div>
-    <form id="poc-form" onsubmit="submitPoc(event)">
 
-        <!-- Step 1: Deployment Basics -->
-        <div class="sizing-section-title">Step 1: Deployment Basics</div>
-        <div class="sizing-input-grid">
-            <div class="sizing-input-group">
-                <label>Panorama IP / Hostname</label>
-                <input type="text" id="poc-panorama-ip" placeholder="e.g. 192.168.1.1 or panorama.corp.com">
-                <span class="sizing-input-hint">Used in generated inventory and credentials</span>
-            </div>
-            <div class="sizing-input-group">
-                <label>Template Name</label>
-                <input type="text" id="poc-template" placeholder="e.g. SDWAN-Template">
-                <span class="sizing-input-hint">Panorama template for device configuration</span>
-            </div>
-            <div class="sizing-input-group">
-                <label>Device Group Name</label>
-                <input type="text" id="poc-device-group" placeholder="e.g. SDWAN-DeviceGroup">
-                <span class="sizing-input-hint">Panorama device group for policies and profiles</span>
-            </div>
+    <div class="poc-wizard">
+        <!-- Progress -->
+        <div class="poc-wizard-progress">
+            <div class="poc-wizard-dot active" id="poc-dot-0"></div>
+            <div class="poc-wizard-dot" id="poc-dot-1"></div>
+            <div class="poc-wizard-dot" id="poc-dot-2"></div>
+            <div class="poc-wizard-dot" id="poc-dot-3"></div>
+            <div class="poc-wizard-dot" id="poc-dot-4"></div>
+            <div class="poc-wizard-dot" id="poc-dot-5"></div>
+            <div class="poc-wizard-dot" id="poc-dot-6"></div>
         </div>
 
-        <!-- Step 2: Topology & VPN -->
-        <div class="sizing-section-title">Step 2: Topology &amp; VPN</div>
-        <div class="sizing-input-grid">
-            <div class="sizing-input-group">
-                <label>Topology Type</label>
-                <select id="poc-topology">
-                    <option value="hub-spoke" selected>Hub-Spoke</option>
-                    <option value="full-mesh">Full Mesh</option>
-                </select>
-            </div>
-            <div class="sizing-input-group">
-                <label>VPN Cluster Name</label>
-                <input type="text" id="poc-cluster-name" placeholder="e.g. SDWAN-VPN-Cluster">
-                <span class="sizing-input-hint">SD-WAN VPN cluster identifier</span>
-            </div>
-            <div class="sizing-input-group">
-                <label>VPN Address Pool</label>
-                <input type="text" id="poc-vpn-pool" placeholder="e.g. 172.16.0.0/16">
-                <span class="sizing-input-hint">IP subnet for SD-WAN VPN tunnel addressing</span>
-            </div>
-        </div>
-
-        <div style="margin-top: 12px;">
-            <label style="font-weight: 600; font-size: 13px; margin-bottom: 6px; display: block;">Hub Devices</label>
-            <div id="poc-hub-devices"></div>
-            <button type="button" class="btn btn-secondary poc-add-btn" onclick="addPocDevice('hub')">+ Add Hub</button>
-        </div>
-
-        <div style="margin-top: 12px;">
-            <label style="font-weight: 600; font-size: 13px; margin-bottom: 6px; display: block;">Branch Devices</label>
-            <div id="poc-branch-devices"></div>
-            <button type="button" class="btn btn-secondary poc-add-btn" onclick="addPocDevice('branch')">+ Add Branch</button>
-        </div>
-
-        <!-- Step 3: Security Zones -->
-        <div class="sizing-section-title">Step 3: Security Zones</div>
-        <div style="margin-top: 12px;">
-            <label style="font-weight: 600; font-size: 13px; margin-bottom: 6px; display: block;">Zones</label>
-            <div id="poc-zones"></div>
-            <button type="button" class="btn btn-secondary poc-add-btn" onclick="addPocZone()">+ Add Zone</button>
-        </div>
-
-        <!-- Step 4: SD-WAN Interface Profiles -->
-        <div class="sizing-section-title">Step 4: SD-WAN Interface Profiles</div>
-        <div class="sizing-input-grid" style="grid-template-columns: 1fr 1fr 1fr;">
-            <div class="sizing-input-group">
-                <label>Probe Frequency (s)</label>
-                <input type="number" id="poc-probe-freq" placeholder="e.g. 5" min="1" max="60">
-                <span class="sizing-input-hint">Path monitoring probe interval</span>
-            </div>
-            <div class="sizing-input-group">
-                <label>Probe Idle Time (s)</label>
-                <input type="number" id="poc-probe-idle" placeholder="e.g. 60" min="10" max="300">
-                <span class="sizing-input-hint">Idle timeout before probing resumes</span>
-            </div>
-            <div class="sizing-input-group">
-                <label>Failback Hold Time (s)</label>
-                <input type="number" id="poc-failback" placeholder="e.g. 120" min="0" max="600">
-                <span class="sizing-input-hint">Wait time before failing back to primary</span>
-            </div>
-        </div>
-        <div style="margin-top: 12px;">
-            <label style="font-weight: 600; font-size: 13px; margin-bottom: 6px; display: block;">Hub Interface Profiles</label>
-            <div id="poc-hub-links"></div>
-            <button type="button" class="btn btn-secondary poc-add-btn" onclick="addPocLink('hub')">+ Add Hub Profile</button>
-        </div>
-        <div style="margin-top: 12px;">
-            <label style="font-weight: 600; font-size: 13px; margin-bottom: 6px; display: block;">Branch Interface Profiles</label>
-            <div id="poc-branch-links"></div>
-            <button type="button" class="btn btn-secondary poc-add-btn" onclick="addPocLink('branch')">+ Add Branch Profile</button>
-        </div>
-
-        <!-- Step 5: Traffic Management -->
-        <div class="sizing-section-title">Step 5: Traffic Management</div>
-        <div class="sizing-input-grid">
-            <div class="sizing-input-group">
-                <label>Traffic Distribution Method</label>
-                <select id="poc-td-method">
-                    <option value="best-available-path" selected>Best Available Path</option>
-                    <option value="top-down">Top Down</option>
-                    <option value="weighted">Weighted</option>
-                </select>
-            </div>
-            <div class="sizing-input-group" style="display: flex; align-items: center; padding-top: 20px;">
-                <label class="sizing-security-toggle" style="margin: 0;">
-                    <div class="toggle-switch">
-                        <input type="checkbox" id="poc-fec">
-                        <span class="toggle-slider"></span>
-                    </div>
-                    <div class="sizing-security-info">
-                        <span class="sizing-security-name">Forward Error Correction (FEC)</span>
-                    </div>
-                </label>
-            </div>
-        </div>
-        <div class="sizing-input-grid" style="margin-top: 12px;">
-            <div class="sizing-input-group">
-                <label>Latency Threshold (ms)</label>
-                <input type="number" id="poc-latency" placeholder="e.g. 100" min="1" max="1000">
-                <span class="sizing-input-hint">Maximum acceptable latency</span>
-            </div>
-            <div class="sizing-input-group">
-                <label>Latency Sensitivity</label>
-                <select id="poc-latency-sens">
-                    <option value="" disabled selected>Select sensitivity</option>
-                    <option value="low">Low</option>
-                    <option value="medium">Medium</option>
-                    <option value="high">High</option>
-                </select>
-            </div>
-            <div class="sizing-input-group">
-                <label>Jitter Threshold (ms)</label>
-                <input type="number" id="poc-jitter" placeholder="e.g. 50" min="1" max="500">
-                <span class="sizing-input-hint">Maximum acceptable jitter</span>
-            </div>
-        </div>
-        <div class="sizing-input-grid" style="margin-top: 12px;">
-            <div class="sizing-input-group">
-                <label>Jitter Sensitivity</label>
-                <select id="poc-jitter-sens">
-                    <option value="" disabled selected>Select sensitivity</option>
-                    <option value="low">Low</option>
-                    <option value="medium">Medium</option>
-                    <option value="high">High</option>
-                </select>
-            </div>
-            <div class="sizing-input-group">
-                <label>Packet Loss Threshold (%)</label>
-                <input type="number" id="poc-pktloss" placeholder="e.g. 5" min="1" max="100">
-                <span class="sizing-input-hint">Maximum acceptable packet loss</span>
-            </div>
-            <div class="sizing-input-group">
-                <label>Packet Loss Sensitivity</label>
-                <select id="poc-pktloss-sens">
-                    <option value="" disabled selected>Select sensitivity</option>
-                    <option value="low">Low</option>
-                    <option value="medium">Medium</option>
-                    <option value="high">High</option>
-                </select>
-            </div>
-        </div>
-
-        <!-- Step 6: SD-WAN Policy (Optional) -->
-        <div class="sizing-section-title">Step 6: SD-WAN Policy — Traffic Steering</div>
-        <div class="sizing-input-grid" style="grid-template-columns: 1fr;">
-            <div class="sizing-input-group" style="display: flex; align-items: center; padding-top: 4px;">
-                <label class="sizing-security-toggle" style="margin: 0;">
-                    <div class="toggle-switch">
-                        <input type="checkbox" id="poc-policy-enabled" onchange="togglePocPolicySection()">
-                        <span class="toggle-slider"></span>
-                    </div>
-                    <div class="sizing-security-info">
-                        <span class="sizing-security-name">Create SD-WAN Policy for Traffic Steering</span>
-                    </div>
-                </label>
-            </div>
-        </div>
-        <div id="poc-policy-section" style="display: none; margin-top: 12px;">
-            <div class="sizing-input-grid" style="grid-template-columns: 1fr;">
-                <div class="sizing-input-group">
-                    <label>Policy Template</label>
-                    <select id="poc-policy-template" onchange="togglePocCustomRules()">
-                        <option value="default" selected>Default — All Traffic</option>
-                        <option value="voice-video">Priority Voice/Video (MS Teams, Zoom, WebEx)</option>
-                        <option value="custom">Custom Rules</option>
-                    </select>
+        <!-- Step 0: Deploy Target -->
+        <div class="poc-wizard-slide active" id="poc-slide-0">
+            <div class="poc-wizard-question">Where will you deploy this POC?</div>
+            <div class="poc-wizard-subtitle">Choose your management platform — this determines the output format</div>
+            <div class="poc-wizard-cards wide">
+                <div class="poc-wizard-card selected" data-group="target" data-value="panorama" onclick="pocSelectCard(this)">
+                    <div class="poc-wizard-card-value">Panorama</div>
+                    <div class="poc-wizard-card-label">Generates Ansible playbooks</div>
+                </div>
+                <div class="poc-wizard-card" data-group="target" data-value="scm" onclick="pocSelectCard(this)">
+                    <div class="poc-wizard-card-value">SCM</div>
+                    <div class="poc-wizard-card-label">Generates Terraform HCL</div>
                 </div>
             </div>
-            <div id="poc-custom-rules-section" style="display: none; margin-top: 12px;">
-                <label style="font-weight: 600; font-size: 13px; margin-bottom: 6px; display: block;">Custom Policy Rules</label>
-                <div id="poc-custom-rules"></div>
-                <button type="button" class="btn btn-secondary poc-add-btn" onclick="addPocRule()">+ Add Rule</button>
+        </div>
+
+        <!-- Step 1: Panorama IP or SCM Folder -->
+        <div class="poc-wizard-slide" id="poc-slide-1">
+            <div id="poc-step1-panorama">
+                <div class="poc-wizard-question">What is your Panorama IP or hostname?</div>
+                <div class="poc-wizard-subtitle">This will be used in the generated Ansible inventory and credentials file</div>
+                <div style="max-width: 400px; margin: 0 auto;">
+                    <input type="text" id="poc-w-panorama" class="poc-wizard-input" placeholder="e.g. 192.168.1.1 or panorama.corp.com">
+                </div>
+            </div>
+            <div id="poc-step1-scm" style="display:none;">
+                <div class="poc-wizard-question">Which SCM folder should resources be placed in?</div>
+                <div class="poc-wizard-subtitle">Resources will be created in this Strata Cloud Manager folder</div>
+                <div style="max-width: 400px; margin: 0 auto;">
+                    <input type="text" id="poc-w-scm-folder" class="poc-wizard-input" placeholder="e.g. Remote Networks" value="Remote Networks">
+                </div>
             </div>
         </div>
 
-        <button type="submit" class="btn" id="poc-submit-btn" style="margin-top: 20px;">Generate POC Playbooks</button>
-    </form>
+        <!-- Step 2: Hub Count -->
+        <div class="poc-wizard-slide" id="poc-slide-2">
+            <div class="poc-wizard-question">How many hub sites?</div>
+            <div class="poc-wizard-subtitle">Hub firewalls serve as SD-WAN concentrators for branch traffic</div>
+            <div class="poc-wizard-cards">
+                <div class="poc-wizard-card selected" data-group="hub_count" data-value="1" onclick="pocSelectCard(this)">
+                    <div class="poc-wizard-card-value">1</div>
+                    <div class="poc-wizard-card-label">Hub</div>
+                </div>
+                <div class="poc-wizard-card" data-group="hub_count" data-value="2" onclick="pocSelectCard(this)">
+                    <div class="poc-wizard-card-value">2</div>
+                    <div class="poc-wizard-card-label">Hubs</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Step 3: Branch Count -->
+        <div class="poc-wizard-slide" id="poc-slide-3">
+            <div class="poc-wizard-question">How many branch sites?</div>
+            <div class="poc-wizard-subtitle">Branch firewalls connect to hubs via SD-WAN VPN tunnels</div>
+            <div class="poc-wizard-cards">
+                <div class="poc-wizard-card" data-group="branch_count" data-value="1" onclick="pocSelectCard(this)">
+                    <div class="poc-wizard-card-value">1</div>
+                    <div class="poc-wizard-card-label">Branch</div>
+                </div>
+                <div class="poc-wizard-card selected" data-group="branch_count" data-value="2" onclick="pocSelectCard(this)">
+                    <div class="poc-wizard-card-value">2</div>
+                    <div class="poc-wizard-card-label">Branches</div>
+                </div>
+                <div class="poc-wizard-card" data-group="branch_count" data-value="3" onclick="pocSelectCard(this)">
+                    <div class="poc-wizard-card-value">3</div>
+                    <div class="poc-wizard-card-label">Branches</div>
+                </div>
+                <div class="poc-wizard-card" data-group="branch_count" data-value="4" onclick="pocSelectCard(this)">
+                    <div class="poc-wizard-card-value">4</div>
+                    <div class="poc-wizard-card-label">Branches</div>
+                </div>
+                <div class="poc-wizard-card" data-group="branch_count" data-value="5" onclick="pocSelectCard(this)">
+                    <div class="poc-wizard-card-value">5</div>
+                    <div class="poc-wizard-card-label">Branches</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Step 4: WAN Link Type -->
+        <div class="poc-wizard-slide" id="poc-slide-4">
+            <div class="poc-wizard-question">What WAN connectivity do your sites have?</div>
+            <div class="poc-wizard-subtitle">This determines the SD-WAN interface profiles and tunnel topology</div>
+            <div class="poc-wizard-cards wide">
+                <div class="poc-wizard-card selected" data-group="wan_type" data-value="internet" onclick="pocSelectCard(this)">
+                    <div class="poc-wizard-card-value">Internet Only</div>
+                    <div class="poc-wizard-card-label">Single public ISP per site</div>
+                </div>
+                <div class="poc-wizard-card" data-group="wan_type" data-value="dual-internet" onclick="pocSelectCard(this)">
+                    <div class="poc-wizard-card-value">Dual Internet</div>
+                    <div class="poc-wizard-card-label">Two public ISPs per site</div>
+                </div>
+                <div class="poc-wizard-card" data-group="wan_type" data-value="mpls-internet" onclick="pocSelectCard(this)">
+                    <div class="poc-wizard-card-value">MPLS + Internet</div>
+                    <div class="poc-wizard-card-label">Private MPLS + public Internet</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Step 5: Bandwidth -->
+        <div class="poc-wizard-slide" id="poc-slide-5">
+            <div class="poc-wizard-question">What is the bandwidth per WAN link?</div>
+            <div class="poc-wizard-subtitle">Used for SD-WAN interface profile upload/download capacity</div>
+            <div class="poc-wizard-cards">
+                <div class="poc-wizard-card" data-group="bandwidth" data-value="50" onclick="pocSelectCard(this)">
+                    <div class="poc-wizard-card-value">50</div>
+                    <div class="poc-wizard-card-label">Mbps</div>
+                </div>
+                <div class="poc-wizard-card selected" data-group="bandwidth" data-value="100" onclick="pocSelectCard(this)">
+                    <div class="poc-wizard-card-value">100</div>
+                    <div class="poc-wizard-card-label">Mbps</div>
+                </div>
+                <div class="poc-wizard-card" data-group="bandwidth" data-value="250" onclick="pocSelectCard(this)">
+                    <div class="poc-wizard-card-value">250</div>
+                    <div class="poc-wizard-card-label">Mbps</div>
+                </div>
+                <div class="poc-wizard-card" data-group="bandwidth" data-value="500" onclick="pocSelectCard(this)">
+                    <div class="poc-wizard-card-value">500</div>
+                    <div class="poc-wizard-card-label">Mbps</div>
+                </div>
+                <div class="poc-wizard-card" data-group="bandwidth" data-value="1000" onclick="pocSelectCard(this)">
+                    <div class="poc-wizard-card-value">1 Gbps</div>
+                    <div class="poc-wizard-card-label">&nbsp;</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Step 6: Review -->
+        <div class="poc-wizard-slide" id="poc-slide-6">
+            <div class="poc-wizard-question">Review &amp; Generate</div>
+            <div class="poc-wizard-subtitle">Confirm your selections below. Everything else is auto-configured.</div>
+            <div class="poc-review-grid">
+                <div class="poc-review-section">
+                    <div class="poc-review-title">Your Selections</div>
+                    <div class="poc-review-row"><span class="poc-review-label">Target</span><span class="poc-review-value" id="poc-rv-target">-</span></div>
+                    <div class="poc-review-row" id="poc-rv-panorama-row"><span class="poc-review-label">Panorama</span><span class="poc-review-value" id="poc-rv-panorama">-</span></div>
+                    <div class="poc-review-row" id="poc-rv-folder-row" style="display:none;"><span class="poc-review-label">SCM Folder</span><span class="poc-review-value" id="poc-rv-folder">-</span></div>
+                    <div class="poc-review-row"><span class="poc-review-label">Topology</span><span class="poc-review-value" id="poc-rv-topology">-</span></div>
+                    <div class="poc-review-row"><span class="poc-review-label">WAN Links</span><span class="poc-review-value" id="poc-rv-wan">-</span></div>
+                    <div class="poc-review-row"><span class="poc-review-label">Bandwidth</span><span class="poc-review-value" id="poc-rv-bw">-</span></div>
+                </div>
+                <div class="poc-review-section">
+                    <div class="poc-review-title">Auto-Configured Features</div>
+                    <div class="poc-review-check">3 Security Zones (trust / untrust / vpn)</div>
+                    <div class="poc-review-check" id="poc-rv-feat-bgp">BGP Routing (AS 65000 / 65001+)</div>
+                    <div class="poc-review-check">3 Path Quality Profiles (Real-Time / Business / Default)</div>
+                    <div class="poc-review-check">3 Traffic Distribution Profiles (TopDown / BestPath / BestPath+FEC)</div>
+                    <div class="poc-review-check">3 SD-WAN Policy Rules (Voice-Video / Business Apps / Default)</div>
+                    <div class="poc-review-check" id="poc-rv-feat-vpn">VPN Cluster with Address Pool</div>
+                    <div class="poc-review-check" id="poc-rv-feat-ifp">SD-WAN Interface Profiles per WAN Link</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Navigation -->
+        <div class="poc-wizard-nav">
+            <button type="button" class="btn btn-secondary" id="poc-w-back" onclick="pocWizardBack()" style="display:none;">&larr; Back</button>
+            <div style="flex:1;"></div>
+            <button type="button" class="btn" id="poc-w-next" onclick="pocWizardNext()">Next &rarr;</button>
+            <button type="button" class="btn btn-success" id="poc-w-generate" onclick="pocWizardGenerate()" style="display:none;">Generate POC Config</button>
+        </div>
+    </div>
 
     <div class="spinner" id="poc-spinner">
-        <p style="margin-top: 12px; font-size: 13px; color: var(--text-secondary);">
-            Generating Ansible playbooks for POC deployment...
+        <p style="margin-top: 12px; font-size: 13px; color: var(--text-secondary);" id="poc-spinner-text">
+            Generating POC deployment package...
         </p>
     </div>
 </div>
@@ -674,15 +636,254 @@
 <div id="poc-results-section" style="display:none;">
     <div style="max-width: 1100px; margin: 0 auto; padding: 16px;">
         <div class="dashboard-actions">
-            <a id="poc-ansible-btn" class="btn btn-success" href="#" download style="width:auto; text-decoration:none;">Download Ansible Playbooks</a>
+            <a id="poc-download-btn" class="btn btn-success" href="#" download style="width:auto; text-decoration:none;">Download POC Config</a>
             <button class="btn btn-secondary" onclick="showLanding()" style="width:auto;">New Analysis</button>
         </div>
     </div>
     <div class="dashboard-results" id="poc-dashboard-content"></div>
 </div>
 
+<!-- SD-WAN Advisor Wizard -->
+<div class="container" id="advisor-form-section" style="display:none;">
+    <div style="margin-bottom:12px;">
+        <button class="btn-back" onclick="showLanding()">&larr; Back</button>
+    </div>
+
+    <div class="poc-wizard">
+        <!-- Progress -->
+        <div class="poc-wizard-progress">
+            <div class="poc-wizard-dot active" id="adv-dot-0"></div>
+            <div class="poc-wizard-dot" id="adv-dot-1"></div>
+            <div class="poc-wizard-dot" id="adv-dot-2"></div>
+            <div class="poc-wizard-dot" id="adv-dot-3"></div>
+            <div class="poc-wizard-dot" id="adv-dot-4"></div>
+            <div class="poc-wizard-dot" id="adv-dot-5"></div>
+            <div class="poc-wizard-dot" id="adv-dot-6"></div>
+        </div>
+
+        <!-- Step 0: Existing PA Firewalls -->
+        <div class="poc-wizard-slide active" id="adv-slide-0">
+            <div class="poc-wizard-question">Does the customer have existing Palo Alto firewalls?</div>
+            <div class="poc-wizard-subtitle">Existing PA investment is a key factor in the SD-WAN recommendation</div>
+            <div class="poc-wizard-cards wide">
+                <div class="poc-wizard-card" data-group="existing_pa" data-value="yes_panorama" onclick="advSelectCard(this)">
+                    <div class="poc-wizard-card-value">Yes — Panorama</div>
+                    <div class="poc-wizard-card-label">PA firewalls managed by Panorama (on-prem)</div>
+                </div>
+                <div class="poc-wizard-card" data-group="existing_pa" data-value="yes_scm" onclick="advSelectCard(this)">
+                    <div class="poc-wizard-card-value">Yes — SCM</div>
+                    <div class="poc-wizard-card-label">PA firewalls managed by Strata Cloud Manager</div>
+                </div>
+                <div class="poc-wizard-card selected" data-group="existing_pa" data-value="no" onclick="advSelectCard(this)">
+                    <div class="poc-wizard-card-value">No</div>
+                    <div class="poc-wizard-card-label">No existing Palo Alto firewalls</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Step 1: Competitor -->
+        <div class="poc-wizard-slide" id="adv-slide-1">
+            <div class="poc-wizard-question">Who is the customer replacing?</div>
+            <div class="poc-wizard-subtitle">The competitor determines displacement messaging and product fit</div>
+            <div class="poc-wizard-cards wide">
+                <div class="poc-wizard-card" data-group="competitor" data-value="fortinet" onclick="advSelectCard(this)">
+                    <div class="poc-wizard-card-value">Fortinet</div>
+                    <div class="poc-wizard-card-label">FortiGate SD-WAN</div>
+                </div>
+                <div class="poc-wizard-card" data-group="competitor" data-value="cisco_viptela" onclick="advSelectCard(this)">
+                    <div class="poc-wizard-card-value">Cisco Viptela</div>
+                    <div class="poc-wizard-card-label">Cisco SD-WAN (vManage)</div>
+                </div>
+                <div class="poc-wizard-card" data-group="competitor" data-value="cisco_meraki" onclick="advSelectCard(this)">
+                    <div class="poc-wizard-card-value">Cisco Meraki</div>
+                    <div class="poc-wizard-card-label">Meraki SD-WAN</div>
+                </div>
+                <div class="poc-wizard-card" data-group="competitor" data-value="velocloud" onclick="advSelectCard(this)">
+                    <div class="poc-wizard-card-value">VeloCloud</div>
+                    <div class="poc-wizard-card-label">VMware SD-WAN</div>
+                </div>
+                <div class="poc-wizard-card" data-group="competitor" data-value="silver_peak" onclick="advSelectCard(this)">
+                    <div class="poc-wizard-card-value">Silver Peak</div>
+                    <div class="poc-wizard-card-label">HPE Aruba SD-WAN</div>
+                </div>
+                <div class="poc-wizard-card selected" data-group="competitor" data-value="none" onclick="advSelectCard(this)">
+                    <div class="poc-wizard-card-value">Greenfield</div>
+                    <div class="poc-wizard-card-label">No existing SD-WAN</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Step 2: Deployment Scale -->
+        <div class="poc-wizard-slide" id="adv-slide-2">
+            <div class="poc-wizard-question">How many branch sites?</div>
+            <div class="poc-wizard-subtitle">Deployment scale influences management complexity and licensing economics</div>
+            <div class="poc-wizard-cards">
+                <div class="poc-wizard-card" data-group="branch_count" data-value="1-10" onclick="advSelectCard(this)">
+                    <div class="poc-wizard-card-value">1-10</div>
+                    <div class="poc-wizard-card-label">Small</div>
+                </div>
+                <div class="poc-wizard-card selected" data-group="branch_count" data-value="11-50" onclick="advSelectCard(this)">
+                    <div class="poc-wizard-card-value">11-50</div>
+                    <div class="poc-wizard-card-label">Medium</div>
+                </div>
+                <div class="poc-wizard-card" data-group="branch_count" data-value="51-200" onclick="advSelectCard(this)">
+                    <div class="poc-wizard-card-value">51-200</div>
+                    <div class="poc-wizard-card-label">Large</div>
+                </div>
+                <div class="poc-wizard-card" data-group="branch_count" data-value="201-500" onclick="advSelectCard(this)">
+                    <div class="poc-wizard-card-value">201-500</div>
+                    <div class="poc-wizard-card-label">Enterprise</div>
+                </div>
+                <div class="poc-wizard-card" data-group="branch_count" data-value="500+" onclick="advSelectCard(this)">
+                    <div class="poc-wizard-card-value">500+</div>
+                    <div class="poc-wizard-card-label">Massive</div>
+                </div>
+            </div>
+            <div style="margin-top: 24px;">
+                <div class="poc-wizard-question" style="font-size: 16px;">How many hub / data center sites?</div>
+                <div class="poc-wizard-cards">
+                    <div class="poc-wizard-card selected" data-group="hub_count" data-value="1" onclick="advSelectCard(this)">
+                        <div class="poc-wizard-card-value">1</div>
+                        <div class="poc-wizard-card-label">Hub</div>
+                    </div>
+                    <div class="poc-wizard-card" data-group="hub_count" data-value="2" onclick="advSelectCard(this)">
+                        <div class="poc-wizard-card-value">2</div>
+                        <div class="poc-wizard-card-label">Hubs</div>
+                    </div>
+                    <div class="poc-wizard-card" data-group="hub_count" data-value="3+" onclick="advSelectCard(this)">
+                        <div class="poc-wizard-card-value">3+</div>
+                        <div class="poc-wizard-card-label">Hubs</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Step 3: Security Requirements -->
+        <div class="poc-wizard-slide" id="adv-slide-3">
+            <div class="poc-wizard-question">What security does the customer need at the branch?</div>
+            <div class="poc-wizard-subtitle">This is the most important differentiator between PAN-OS and Prisma SD-WAN</div>
+            <div class="poc-wizard-cards wide">
+                <div class="poc-wizard-card selected" data-group="security" data-value="full_ngfw" onclick="advSelectCard(this)">
+                    <div class="poc-wizard-card-value">Full NGFW</div>
+                    <div class="poc-wizard-card-label">IPS, AV, WildFire, SSL Decrypt at every branch</div>
+                </div>
+                <div class="poc-wizard-card" data-group="security" data-value="cloud_delivered" onclick="advSelectCard(this)">
+                    <div class="poc-wizard-card-value">Cloud Security</div>
+                    <div class="poc-wizard-card-label">Security delivered from cloud (SASE / Prisma Access)</div>
+                </div>
+                <div class="poc-wizard-card" data-group="security" data-value="basic" onclick="advSelectCard(this)">
+                    <div class="poc-wizard-card-value">Basic Firewall</div>
+                    <div class="poc-wizard-card-label">Zone-based firewall sufficient</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Step 4: Management Preference -->
+        <div class="poc-wizard-slide" id="adv-slide-4">
+            <div class="poc-wizard-question">How does the customer want to manage SD-WAN?</div>
+            <div class="poc-wizard-subtitle">Management model preference strongly influences the product recommendation</div>
+            <div class="poc-wizard-cards wide">
+                <div class="poc-wizard-card" data-group="management" data-value="on_prem" onclick="advSelectCard(this)">
+                    <div class="poc-wizard-card-value">On-Premises</div>
+                    <div class="poc-wizard-card-label">Panorama — centralized on-prem management</div>
+                </div>
+                <div class="poc-wizard-card" data-group="management" data-value="cloud" onclick="advSelectCard(this)">
+                    <div class="poc-wizard-card-value">Cloud-Managed</div>
+                    <div class="poc-wizard-card-label">Strata Cloud Manager — SaaS management</div>
+                </div>
+                <div class="poc-wizard-card selected" data-group="management" data-value="no_preference" onclick="advSelectCard(this)">
+                    <div class="poc-wizard-card-value">No Preference</div>
+                    <div class="poc-wizard-card-label">Open to either management model</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Step 5: Key Priorities (multi-select) -->
+        <div class="poc-wizard-slide" id="adv-slide-5">
+            <div class="poc-wizard-question">What are the customer's key priorities?</div>
+            <div class="poc-wizard-subtitle">Select all that apply — these influence the final recommendation weighting</div>
+            <div class="poc-wizard-cards wide">
+                <div class="poc-wizard-card" data-priority="leverage_investment" onclick="advTogglePriority(this)">
+                    <div class="poc-wizard-card-value">Leverage Investment</div>
+                    <div class="poc-wizard-card-label">Maximize existing PA firewall ROI</div>
+                </div>
+                <div class="poc-wizard-card" data-priority="advanced_threat" onclick="advTogglePriority(this)">
+                    <div class="poc-wizard-card-value">Advanced Threat Prevention</div>
+                    <div class="poc-wizard-card-label">Best-in-class IPS/AV at every site</div>
+                </div>
+                <div class="poc-wizard-card" data-priority="sase" onclick="advTogglePriority(this)">
+                    <div class="poc-wizard-card-value">SASE / Zero Trust</div>
+                    <div class="poc-wizard-card-label">Cloud-delivered security convergence</div>
+                </div>
+                <div class="poc-wizard-card" data-priority="rapid_deploy" onclick="advTogglePriority(this)">
+                    <div class="poc-wizard-card-value">Rapid Deployment</div>
+                    <div class="poc-wizard-card-label">Zero-touch provisioning, fast rollout</div>
+                </div>
+                <div class="poc-wizard-card" data-priority="cost" onclick="advTogglePriority(this)">
+                    <div class="poc-wizard-card-value">Cost Optimization</div>
+                    <div class="poc-wizard-card-label">Replace MPLS, reduce WAN costs</div>
+                </div>
+                <div class="poc-wizard-card" data-priority="iot_security" onclick="advTogglePriority(this)">
+                    <div class="poc-wizard-card-value">IoT Security</div>
+                    <div class="poc-wizard-card-label">Discover and secure IoT devices</div>
+                </div>
+                <div class="poc-wizard-card" data-priority="multi_cloud" onclick="advTogglePriority(this)">
+                    <div class="poc-wizard-card-value">Multi-Cloud</div>
+                    <div class="poc-wizard-card-label">Connect to AWS, Azure, GCP</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Step 6: Review -->
+        <div class="poc-wizard-slide" id="adv-slide-6">
+            <div class="poc-wizard-question">Review &amp; Get Recommendation</div>
+            <div class="poc-wizard-subtitle">Confirm your inputs below. The advisor will score both solutions and provide a recommendation.</div>
+            <div class="poc-review-grid">
+                <div class="poc-review-section">
+                    <div class="poc-review-title">Customer Profile</div>
+                    <div class="poc-review-row"><span class="poc-review-label">Existing PA</span><span class="poc-review-value" id="adv-rv-pa">-</span></div>
+                    <div class="poc-review-row"><span class="poc-review-label">Competitor</span><span class="poc-review-value" id="adv-rv-comp">-</span></div>
+                    <div class="poc-review-row"><span class="poc-review-label">Branch Sites</span><span class="poc-review-value" id="adv-rv-branches">-</span></div>
+                    <div class="poc-review-row"><span class="poc-review-label">Hub Sites</span><span class="poc-review-value" id="adv-rv-hubs">-</span></div>
+                    <div class="poc-review-row"><span class="poc-review-label">Security</span><span class="poc-review-value" id="adv-rv-security">-</span></div>
+                    <div class="poc-review-row"><span class="poc-review-label">Management</span><span class="poc-review-value" id="adv-rv-mgmt">-</span></div>
+                </div>
+                <div class="poc-review-section">
+                    <div class="poc-review-title">Key Priorities</div>
+                    <div id="adv-rv-priorities">-</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Navigation -->
+        <div class="poc-wizard-nav">
+            <button type="button" class="btn btn-secondary" id="adv-w-back" onclick="advWizardBack()" style="display:none;">&larr; Back</button>
+            <div style="flex:1;"></div>
+            <button type="button" class="btn" id="adv-w-next" onclick="advWizardNext()">Next &rarr;</button>
+            <button type="button" class="btn btn-success" id="adv-w-generate" onclick="advWizardGenerate()" style="display:none;">Get Recommendation</button>
+        </div>
+    </div>
+
+    <div class="spinner" id="advisor-spinner">
+        <p style="margin-top: 12px; font-size: 13px; color: var(--text-secondary);">
+            Analyzing customer profile and generating recommendation...
+        </p>
+    </div>
+</div>
+
+<!-- Advisor Results -->
+<div id="advisor-results-section" style="display:none;">
+    <div style="max-width: 1100px; margin: 0 auto; padding: 16px;">
+        <div class="dashboard-actions">
+            <a id="advisor-excel-btn" class="btn btn-success" href="#" download style="width:auto; text-decoration:none;">Download Advisor Report</a>
+            <button class="btn btn-secondary" onclick="showLanding()" style="width:auto;">New Analysis</button>
+        </div>
+    </div>
+    <div class="dashboard-results" id="advisor-dashboard-content"></div>
+</div>
+
 <div class="footer" id="main-footer">
-    PAN-OS SD-WAN Toolkit &mdash; Configuration Analysis, SCM Migration, Firewall Sizing &amp; POC Generator
+    PAN-OS SD-WAN Toolkit &mdash; Configuration Analysis, SCM Migration, Firewall Sizing, POC Generator &amp; SD-WAN Advisor
 </div>
 
 <script>
@@ -708,6 +909,12 @@ function selectMode(mode) {
     if (mode === 'poc') {
         document.getElementById('poc-form-section').style.display = '';
         initPocForm();
+        return;
+    }
+
+    if (mode === 'advisor') {
+        document.getElementById('advisor-form-section').style.display = '';
+        initAdvisorForm();
         return;
     }
 
@@ -739,6 +946,8 @@ function showLanding() {
     document.getElementById('sizing-results-section').style.display = 'none';
     document.getElementById('poc-form-section').style.display = 'none';
     document.getElementById('poc-results-section').style.display = 'none';
+    document.getElementById('advisor-form-section').style.display = 'none';
+    document.getElementById('advisor-results-section').style.display = 'none';
     document.getElementById('main-footer').style.display = '';
 }
 
@@ -1087,8 +1296,6 @@ function initSizingDropdowns() {
     var dropdowns = [
         {select: 'sz-hub-bw', custom: 'sz-hub-bw-custom'},
         {select: 'sz-branch-bw', custom: 'sz-branch-bw-custom'},
-        {select: 'sz-hub-sessions', custom: 'sz-hub-sessions-custom'},
-        {select: 'sz-branch-sessions', custom: 'sz-branch-sessions-custom'},
     ];
     dropdowns.forEach(function(d) {
         var sel = document.getElementById(d.select);
@@ -1105,6 +1312,14 @@ function initSizingDropdowns() {
             }
         };
     });
+    // Topology hint
+    var topoSel = document.getElementById('sz-topology');
+    var topoHint = document.getElementById('sz-topology-hint');
+    topoSel.onchange = function() {
+        topoHint.textContent = topoSel.value === 'full-mesh'
+            ? 'Tunnels between all sites including branch-to-branch'
+            : 'Tunnels between hubs and branches only';
+    };
 }
 
 function getSizingValue(selectId, customId) {
@@ -1132,8 +1347,7 @@ function submitSizing(e) {
     formData.append('branch_private_isps', document.getElementById('sz-branch-private').value);
     formData.append('hub_bandwidth_mbps', getSizingValue('sz-hub-bw', 'sz-hub-bw-custom'));
     formData.append('branch_bandwidth_mbps', getSizingValue('sz-branch-bw', 'sz-branch-bw-custom'));
-    formData.append('hub_sessions', getSizingValue('sz-hub-sessions', 'sz-hub-sessions-custom'));
-    formData.append('branch_sessions', getSizingValue('sz-branch-sessions', 'sz-branch-sessions-custom'));
+    formData.append('topology', document.getElementById('sz-topology').value);
     formData.append('threat_prevention', document.getElementById('sz-tp').checked ? 'yes' : 'no');
     formData.append('ssl_decryption', document.getElementById('sz-ssl').checked ? 'yes' : 'no');
     formData.append('url_filtering', document.getElementById('sz-url').checked ? 'yes' : 'no');
@@ -1224,195 +1438,298 @@ function showSizingDashboard(html, excelUrl) {
 
 // ── POC Config Generator ──────────────────────────────────────
 
-var pocDeviceCounters = { hub: 0, branch: 0 };
-var pocLinkCounters = { hub: 0, branch: 0 };
-var pocRuleCounter = 0;
-var pocZoneCounter = 0;
+// ── POC Wizard ─────────────────────────────────────────────
+var pocStep = 0;
+var pocTotalSteps = 7; // 0-6
+
+var pocSelections = {
+    target: 'panorama',
+    hub_count: '1',
+    branch_count: '2',
+    wan_type: 'internet',
+    bandwidth: '100'
+};
 
 function initPocForm() {
-    // Reset and add default rows
-    pocDeviceCounters = { hub: 0, branch: 0 };
-    pocLinkCounters = { hub: 0, branch: 0 };
-    pocRuleCounter = 0;
-    pocZoneCounter = 0;
-    document.getElementById('poc-hub-devices').innerHTML = '';
-    document.getElementById('poc-branch-devices').innerHTML = '';
-    document.getElementById('poc-hub-links').innerHTML = '';
-    document.getElementById('poc-branch-links').innerHTML = '';
-    document.getElementById('poc-zones').innerHTML = '';
-    document.getElementById('poc-custom-rules').innerHTML = '';
-    // Add starter rows (empty, user fills in)
-    addPocDevice('hub');
-    addPocDevice('branch');
-    addPocDevice('branch');
-    addPocLink('hub');
-    addPocLink('hub');
-    addPocLink('branch');
-    addPocZone();
-    addPocZone();
+    pocStep = 0;
+    pocSelections.target = 'panorama';
+    pocShowSlide(0);
 }
 
-function addPocDevice(role) {
-    var idx = pocDeviceCounters[role]++;
-    var container = document.getElementById('poc-' + role + '-devices');
-    var row = document.createElement('div');
-    row.className = 'poc-device-block';
-    row.id = 'poc-' + role + '-dev-' + idx;
-    var serialHint = role === 'hub' ? 'e.g. 0123456789' : 'e.g. 9876543210';
-    var nameHint = role === 'hub' ? 'e.g. DC-Hub-01' : 'e.g. Branch-NYC-01';
-    var siteHint = role === 'hub' ? 'e.g. Datacenter-East' : 'e.g. New-York-Office';
-    var asHint = role === 'hub' ? 'e.g. 65000' : 'e.g. 65001';
-    var ridHint = role === 'hub' ? 'e.g. 10.0.0.1' : 'e.g. 10.1.0.1';
-    var loHint = role === 'hub' ? 'e.g. 10.255.0.1/32' : 'e.g. 10.255.1.1/32';
-    var lrHint = role === 'hub' ? 'e.g. Hub-LR-01' : 'e.g. Branch-LR-01';
-    row.innerHTML =
-        '<div class="poc-device-block-header">' +
-            '<span class="poc-device-block-label">' + (role === 'hub' ? 'Hub' : 'Branch') + ' ' + (idx + 1) + '</span>' +
-            '<button type="button" class="poc-remove-btn" onclick="this.closest(\'.poc-device-block\').remove()">&times;</button>' +
-        '</div>' +
-        '<div class="poc-dynamic-row">' +
-            '<div class="poc-labeled-field"><label>Serial</label><input type="text" name="poc_' + role + '_serial_' + idx + '" placeholder="' + serialHint + '"></div>' +
-            '<div class="poc-labeled-field"><label>Name</label><input type="text" name="poc_' + role + '_name_' + idx + '" placeholder="' + nameHint + '"></div>' +
-            '<div class="poc-labeled-field"><label>Site</label><input type="text" name="poc_' + role + '_site_' + idx + '" placeholder="' + siteHint + '"></div>' +
-        '</div>' +
-        '<div class="poc-dynamic-row">' +
-            '<div class="poc-labeled-field"><label>AS Number</label><input type="text" name="poc_' + role + '_as_' + idx + '" placeholder="' + asHint + '"></div>' +
-            '<div class="poc-labeled-field"><label>Router ID</label><input type="text" name="poc_' + role + '_rid_' + idx + '" placeholder="' + ridHint + '"></div>' +
-            '<div class="poc-labeled-field"><label>Loopback</label><input type="text" name="poc_' + role + '_loopback_' + idx + '" placeholder="' + loHint + '"></div>' +
-            '<div class="poc-labeled-field"><label>Logical Router</label><input type="text" name="poc_' + role + '_lr_' + idx + '" placeholder="' + lrHint + '"></div>' +
-        '</div>';
-    container.appendChild(row);
+function pocSelectCard(el) {
+    var group = el.getAttribute('data-group');
+    var value = el.getAttribute('data-value');
+    pocSelections[group] = value;
+    // Deselect siblings
+    var siblings = document.querySelectorAll('.poc-wizard-card[data-group="' + group + '"]');
+    for (var i = 0; i < siblings.length; i++) siblings[i].classList.remove('selected');
+    el.classList.add('selected');
+
+    // Toggle step 1 content based on target selection
+    if (group === 'target') {
+        pocUpdateStep1();
+    }
 }
 
-function addPocLink(role) {
-    var idx = pocLinkCounters[role]++;
-    var container = document.getElementById('poc-' + role + '-links');
-    var row = document.createElement('div');
-    row.className = 'poc-link-block';
-    row.id = 'poc-' + role + '-link-' + idx;
-    var nameHint = role === 'hub' ? 'e.g. Hub-ISP-Public-1' : 'e.g. Branch-ISP-Public-1';
-    var bwHint = role === 'hub' ? 'e.g. 500' : 'e.g. 100';
-    row.innerHTML =
-        '<div class="poc-link-block-header">' +
-            '<span class="poc-link-block-label">' + (role === 'hub' ? 'Hub' : 'Branch') + ' Profile ' + (idx + 1) + '</span>' +
-            '<button type="button" class="poc-remove-btn" onclick="this.closest(\'.poc-link-block\').remove()">&times;</button>' +
-        '</div>' +
-        '<div class="poc-dynamic-row">' +
-            '<div class="poc-labeled-field"><label>Profile Name</label><input type="text" name="poc_' + role + '_link_name_' + idx + '" placeholder="' + nameHint + '"></div>' +
-            '<div class="poc-labeled-field"><label>Link Type</label><select name="poc_' + role + '_link_type_' + idx + '">' +
-                '<option value="" disabled selected>Select type</option>' +
-                '<option value="public">Public (Internet)</option>' +
-                '<option value="private">Private (MPLS)</option>' +
-            '</select></div>' +
-            '<div class="poc-labeled-field"><label>Bandwidth (Mbps)</label><input type="number" name="poc_' + role + '_link_bw_' + idx + '" placeholder="' + bwHint + '" min="1"></div>' +
-        '</div>';
-    container.appendChild(row);
+function pocUpdateStep1() {
+    var isScm = pocSelections.target === 'scm';
+    document.getElementById('poc-step1-panorama').style.display = isScm ? 'none' : '';
+    document.getElementById('poc-step1-scm').style.display = isScm ? '' : 'none';
 }
 
-function addPocZone() {
-    var idx = pocZoneCounter++;
-    var container = document.getElementById('poc-zones');
-    var row = document.createElement('div');
-    row.className = 'poc-link-block';
-    row.id = 'poc-zone-' + idx;
-    row.innerHTML =
-        '<div class="poc-link-block-header">' +
-            '<span class="poc-link-block-label">Zone ' + (idx + 1) + '</span>' +
-            '<button type="button" class="poc-remove-btn" onclick="this.closest(\'.poc-link-block\').remove()">&times;</button>' +
-        '</div>' +
-        '<div class="poc-dynamic-row">' +
-            '<div class="poc-labeled-field"><label>Zone Name</label><input type="text" name="poc_zone_name_' + idx + '" placeholder="e.g. trust"></div>' +
-            '<div class="poc-labeled-field"><label>Zone Type</label><select name="poc_zone_type_' + idx + '">' +
-                '<option value="layer3" selected>Layer3</option>' +
-                '<option value="layer2">Layer2</option>' +
-                '<option value="virtual-wire">Virtual Wire</option>' +
-                '<option value="tap">Tap</option>' +
-            '</select></div>' +
-        '</div>';
-    container.appendChild(row);
+function pocShowSlide(step) {
+    pocStep = step;
+    for (var i = 0; i < pocTotalSteps; i++) {
+        document.getElementById('poc-slide-' + i).classList.toggle('active', i === step);
+        document.getElementById('poc-dot-' + i).classList.toggle('active', i <= step);
+    }
+    document.getElementById('poc-w-back').style.display = step === 0 ? 'none' : '';
+    document.getElementById('poc-w-next').style.display = step === pocTotalSteps - 1 ? 'none' : '';
+    document.getElementById('poc-w-generate').style.display = step === pocTotalSteps - 1 ? '' : 'none';
+
+    // Update step 1 display when navigating
+    if (step === 1) pocUpdateStep1();
+
+    // Populate review on last step
+    if (step === pocTotalSteps - 1) pocPopulateReview();
 }
 
-function addPocRule() {
-    var idx = pocRuleCounter++;
-    var container = document.getElementById('poc-custom-rules');
-    var row = document.createElement('div');
-    row.className = 'poc-dynamic-row';
-    row.innerHTML =
-        '<input type="text" name="poc_rule_name_' + idx + '" placeholder="e.g. Allow-VoiceVideo">' +
-        '<input type="text" name="poc_rule_apps_' + idx + '" placeholder="e.g. ms-teams, zoom, webex">' +
-        '<button type="button" class="poc-remove-btn" onclick="this.parentElement.remove()">&times;</button>';
-    container.appendChild(row);
+function pocWizardNext() {
+    if (pocStep === 1) {
+        if (pocSelections.target === 'panorama') {
+            var ip = document.getElementById('poc-w-panorama').value.trim();
+            if (!ip) { alert('Please enter the Panorama IP or hostname.'); return; }
+        }
+    }
+    if (pocStep < pocTotalSteps - 1) pocShowSlide(pocStep + 1);
 }
 
-function togglePocPolicySection() {
-    var enabled = document.getElementById('poc-policy-enabled').checked;
-    document.getElementById('poc-policy-section').style.display = enabled ? '' : 'none';
+function pocWizardBack() {
+    if (pocStep > 0) pocShowSlide(pocStep - 1);
 }
 
-function togglePocCustomRules() {
-    var sel = document.getElementById('poc-policy-template');
-    document.getElementById('poc-custom-rules-section').style.display =
-        sel.value === 'custom' ? '' : 'none';
+function pocPopulateReview() {
+    var isScm = pocSelections.target === 'scm';
+    var hubs = pocSelections.hub_count;
+    var branches = pocSelections.branch_count;
+    var wanLabels = { 'internet': 'Internet Only', 'dual-internet': 'Dual Internet', 'mpls-internet': 'MPLS + Internet' };
+    var bw = pocSelections.bandwidth === '1000' ? '1 Gbps' : pocSelections.bandwidth + ' Mbps';
+
+    document.getElementById('poc-rv-target').textContent = isScm ? 'SCM (Terraform)' : 'Panorama (Ansible)';
+
+    // Show/hide Panorama or SCM Folder row
+    document.getElementById('poc-rv-panorama-row').style.display = isScm ? 'none' : '';
+    document.getElementById('poc-rv-folder-row').style.display = isScm ? '' : 'none';
+
+    if (isScm) {
+        var folder = document.getElementById('poc-w-scm-folder').value.trim() || 'Remote Networks';
+        document.getElementById('poc-rv-folder').textContent = folder;
+    } else {
+        var ip = document.getElementById('poc-w-panorama').value.trim();
+        document.getElementById('poc-rv-panorama').textContent = ip || '-';
+    }
+
+    document.getElementById('poc-rv-topology').textContent = hubs + ' Hub \u2192 ' + branches + ' Branch' + (branches > 1 ? 'es' : '');
+    document.getElementById('poc-rv-wan').textContent = wanLabels[pocSelections.wan_type] || pocSelections.wan_type;
+    document.getElementById('poc-rv-bw').textContent = bw + ' per link';
+
+    // Show/hide Panorama-only features in auto-configured list
+    document.getElementById('poc-rv-feat-bgp').style.display = isScm ? 'none' : '';
+    document.getElementById('poc-rv-feat-vpn').style.display = isScm ? 'none' : '';
+    document.getElementById('poc-rv-feat-ifp').style.display = isScm ? 'none' : '';
+
+    // Update generate button text
+    document.getElementById('poc-w-generate').textContent = isScm ? 'Generate Terraform Config' : 'Generate Ansible Playbooks';
 }
 
-function submitPoc(e) {
-    e.preventDefault();
-    var btn = document.getElementById('poc-submit-btn');
+function pocWizardGenerate() {
+    var btn = document.getElementById('poc-w-generate');
+    var isScm = pocSelections.target === 'scm';
     btn.disabled = true;
     btn.textContent = 'Generating...';
     document.getElementById('poc-spinner').style.display = 'flex';
+    document.getElementById('poc-spinner-text').textContent = isScm
+        ? 'Generating Terraform HCL for SCM deployment...'
+        : 'Generating Ansible playbooks for Panorama deployment...';
 
-    var formData = new FormData(document.getElementById('poc-form'));
-    // Add fields that aren't in named inputs
-    formData.set('panorama_ip', document.getElementById('poc-panorama-ip').value);
-    formData.set('template_name', document.getElementById('poc-template').value);
-    formData.set('device_group', document.getElementById('poc-device-group').value);
-    formData.set('topology_type', document.getElementById('poc-topology').value);
-    formData.set('cluster_name', document.getElementById('poc-cluster-name').value);
-    formData.set('vpn_address_pool', document.getElementById('poc-vpn-pool').value);
-    formData.set('probe_frequency', document.getElementById('poc-probe-freq').value);
-    formData.set('probe_idle_time', document.getElementById('poc-probe-idle').value);
-    formData.set('failback_hold_time', document.getElementById('poc-failback').value);
-    formData.set('td_method', document.getElementById('poc-td-method').value);
-    formData.set('fec_enabled', document.getElementById('poc-fec').checked ? 'yes' : 'no');
-    formData.set('latency_threshold', document.getElementById('poc-latency').value);
-    formData.set('latency_sensitivity', document.getElementById('poc-latency-sens').value);
-    formData.set('jitter_threshold', document.getElementById('poc-jitter').value);
-    formData.set('jitter_sensitivity', document.getElementById('poc-jitter-sens').value);
-    formData.set('pkt_loss_threshold', document.getElementById('poc-pktloss').value);
-    formData.set('pkt_loss_sensitivity', document.getElementById('poc-pktloss-sens').value);
-    var policyEnabled = document.getElementById('poc-policy-enabled').checked;
-    formData.set('policy_enabled', policyEnabled ? 'yes' : 'no');
-    if (policyEnabled) {
-        formData.set('policy_template', document.getElementById('poc-policy-template').value);
+    var formData = new FormData();
+    formData.set('target', pocSelections.target);
+    if (isScm) {
+        formData.set('scm_folder', document.getElementById('poc-w-scm-folder').value.trim() || 'Remote Networks');
+    } else {
+        formData.set('panorama_ip', document.getElementById('poc-w-panorama').value.trim());
     }
+    formData.set('hub_count', pocSelections.hub_count);
+    formData.set('branch_count', pocSelections.branch_count);
+    formData.set('wan_type', pocSelections.wan_type);
+    formData.set('bandwidth', pocSelections.bandwidth);
 
     fetch('/generate-poc', { method: 'POST', body: formData })
         .then(function(resp) { return resp.json(); })
         .then(function(data) {
             btn.disabled = false;
-            btn.textContent = 'Generate POC Playbooks';
+            btn.textContent = isScm ? 'Generate Terraform Config' : 'Generate Ansible Playbooks';
             document.getElementById('poc-spinner').style.display = 'none';
             if (data.error) {
                 alert('Error: ' + data.error);
                 return;
             }
-            showPocDashboard(data.dashboard_html, data.ansible_url);
+            var dlBtn = document.getElementById('poc-download-btn');
+            dlBtn.textContent = isScm ? 'Download Terraform Config' : 'Download Ansible Playbooks';
+            showPocDashboard(data.dashboard_html, data.poc_url);
         })
         .catch(function(err) {
             btn.disabled = false;
-            btn.textContent = 'Generate POC Playbooks';
+            btn.textContent = isScm ? 'Generate Terraform Config' : 'Generate Ansible Playbooks';
             document.getElementById('poc-spinner').style.display = 'none';
             alert('Error: ' + err.message);
         });
 }
 
-function showPocDashboard(html, ansibleUrl) {
+function showPocDashboard(html, pocUrl) {
     document.getElementById('poc-form-section').style.display = 'none';
     document.getElementById('main-footer').style.display = 'none';
     document.getElementById('poc-dashboard-content').innerHTML = html;
-    document.getElementById('poc-ansible-btn').href = ansibleUrl;
+    document.getElementById('poc-download-btn').href = pocUrl;
     document.getElementById('poc-results-section').style.display = '';
+    window.scrollTo(0, 0);
+}
+
+// ── SD-WAN Advisor ──────────────────────────────────────────
+
+var advStep = 0;
+var advTotalSteps = 7;
+
+var advSelections = {
+    existing_pa: 'no',
+    competitor: 'none',
+    branch_count: '11-50',
+    hub_count: '1',
+    security: 'full_ngfw',
+    management: 'no_preference',
+    priorities: []
+};
+
+function initAdvisorForm() {
+    advStep = 0;
+    advSelections.priorities = [];
+    // Reset priority card selections
+    var priCards = document.querySelectorAll('#adv-slide-5 .poc-wizard-card');
+    for (var i = 0; i < priCards.length; i++) priCards[i].classList.remove('selected');
+    advShowSlide(0);
+}
+
+function advSelectCard(el) {
+    var group = el.getAttribute('data-group');
+    var value = el.getAttribute('data-value');
+    advSelections[group] = value;
+    var siblings = document.querySelectorAll('#advisor-form-section .poc-wizard-card[data-group="' + group + '"]');
+    for (var i = 0; i < siblings.length; i++) siblings[i].classList.remove('selected');
+    el.classList.add('selected');
+}
+
+function advTogglePriority(el) {
+    var p = el.getAttribute('data-priority');
+    var idx = advSelections.priorities.indexOf(p);
+    if (idx >= 0) {
+        advSelections.priorities.splice(idx, 1);
+        el.classList.remove('selected');
+    } else {
+        advSelections.priorities.push(p);
+        el.classList.add('selected');
+    }
+}
+
+function advShowSlide(step) {
+    advStep = step;
+    for (var i = 0; i < advTotalSteps; i++) {
+        document.getElementById('adv-slide-' + i).classList.toggle('active', i === step);
+        document.getElementById('adv-dot-' + i).classList.toggle('active', i <= step);
+    }
+    document.getElementById('adv-w-back').style.display = step === 0 ? 'none' : '';
+    document.getElementById('adv-w-next').style.display = step === advTotalSteps - 1 ? 'none' : '';
+    document.getElementById('adv-w-generate').style.display = step === advTotalSteps - 1 ? '' : 'none';
+
+    if (step === advTotalSteps - 1) advPopulateReview();
+}
+
+function advWizardNext() {
+    if (advStep < advTotalSteps - 1) advShowSlide(advStep + 1);
+}
+
+function advWizardBack() {
+    if (advStep > 0) advShowSlide(advStep - 1);
+}
+
+function advPopulateReview() {
+    var paLabels = { 'yes_panorama': 'Yes — Panorama', 'yes_scm': 'Yes — SCM', 'no': 'No' };
+    var compLabels = { 'fortinet': 'Fortinet', 'cisco_viptela': 'Cisco Viptela', 'cisco_meraki': 'Cisco Meraki', 'velocloud': 'VeloCloud', 'silver_peak': 'Silver Peak', 'none': 'Greenfield' };
+    var secLabels = { 'full_ngfw': 'Full NGFW', 'cloud_delivered': 'Cloud Security', 'basic': 'Basic Firewall' };
+    var mgmtLabels = { 'on_prem': 'On-Premises (Panorama)', 'cloud': 'Cloud-Managed (SCM)', 'no_preference': 'No Preference' };
+    var priLabels = { 'cost': 'Cost Optimization', 'sase': 'SASE / Zero Trust', 'rapid_deploy': 'Rapid Deployment', 'leverage_investment': 'Leverage Investment', 'advanced_threat': 'Advanced Threat Prevention', 'iot_security': 'IoT Security', 'multi_cloud': 'Multi-Cloud' };
+
+    document.getElementById('adv-rv-pa').textContent = paLabels[advSelections.existing_pa] || '-';
+    document.getElementById('adv-rv-comp').textContent = compLabels[advSelections.competitor] || '-';
+    document.getElementById('adv-rv-branches').textContent = advSelections.branch_count;
+    document.getElementById('adv-rv-hubs').textContent = advSelections.hub_count;
+    document.getElementById('adv-rv-security').textContent = secLabels[advSelections.security] || '-';
+    document.getElementById('adv-rv-mgmt').textContent = mgmtLabels[advSelections.management] || '-';
+
+    var priDiv = document.getElementById('adv-rv-priorities');
+    if (advSelections.priorities.length === 0) {
+        priDiv.innerHTML = '<span style="color: var(--text-secondary); font-size: 13px;">No priorities selected</span>';
+    } else {
+        var html = '';
+        for (var i = 0; i < advSelections.priorities.length; i++) {
+            html += '<div class="poc-review-check">' + (priLabels[advSelections.priorities[i]] || advSelections.priorities[i]) + '</div>';
+        }
+        priDiv.innerHTML = html;
+    }
+}
+
+function advWizardGenerate() {
+    var btn = document.getElementById('adv-w-generate');
+    btn.disabled = true;
+    btn.textContent = 'Analyzing...';
+    document.getElementById('advisor-spinner').style.display = 'flex';
+
+    var formData = new FormData();
+    formData.set('existing_pa', advSelections.existing_pa);
+    formData.set('competitor', advSelections.competitor);
+    formData.set('branch_count', advSelections.branch_count);
+    formData.set('hub_count', advSelections.hub_count);
+    formData.set('security', advSelections.security);
+    formData.set('management', advSelections.management);
+    for (var i = 0; i < advSelections.priorities.length; i++) {
+        formData.append('priorities', advSelections.priorities[i]);
+    }
+
+    fetch('/advisor-recommend', { method: 'POST', body: formData })
+        .then(function(resp) { return resp.json(); })
+        .then(function(data) {
+            btn.disabled = false;
+            btn.textContent = 'Get Recommendation';
+            document.getElementById('advisor-spinner').style.display = 'none';
+            if (data.error) {
+                alert('Error: ' + data.error);
+                return;
+            }
+            showAdvisorDashboard(data.dashboard_html, data.excel_url);
+        })
+        .catch(function(err) {
+            btn.disabled = false;
+            btn.textContent = 'Get Recommendation';
+            document.getElementById('advisor-spinner').style.display = 'none';
+            alert('Error: ' + err.message);
+        });
+}
+
+function showAdvisorDashboard(html, excelUrl) {
+    document.getElementById('advisor-form-section').style.display = 'none';
+    document.getElementById('main-footer').style.display = 'none';
+    document.getElementById('advisor-dashboard-content').innerHTML = html;
+    document.getElementById('advisor-excel-btn').href = excelUrl;
+    document.getElementById('advisor-results-section').style.display = '';
     window.scrollTo(0, 0);
 }
 </script>

@@ -1,8 +1,8 @@
 # PAN-OS SD-WAN Toolkit
 
-Docker-based web application for Palo Alto Networks SD-WAN professionals. Three integrated tools: Configuration Analysis with deployment scoring, SCM Migration with Terraform HCL generation, and Firewall Sizing Calculator with hardware and VM-Series recommendations.
+Docker-based web application for Palo Alto Networks SD-WAN professionals. Four integrated tools: Configuration Analysis with deployment scoring, SCM Migration with Terraform HCL generation, Firewall Sizing Calculator with hardware and VM-Series recommendations, and POC Config Generator with Ansible/Terraform output.
 
-## Three Modes
+## Four Modes
 
 ### 1. Configuration Analysis
 Upload Panorama or NGFW XML configs to generate deployment reports with maturity scoring, gap analysis, and multi-config comparison.
@@ -38,6 +38,16 @@ Input site requirements and get PA firewall model recommendations for SD-WAN dep
 - Full device specs: throughput, sessions, tunnels, ports, form factor, HA support
 - Downloadable Excel report with model comparison sheet
 - **Datasheet References (RAG)**: Auto-fetches and indexes official PA datasheets, surfaces relevant excerpts alongside sizing recommendations
+
+### 4. POC Config Generator
+Step-by-step wizard to generate SD-WAN proof-of-concept deployment packages with maximum feature coverage from minimal input.
+
+- **Dual target**: Panorama (Ansible playbooks) or SCM (Terraform HCL)
+- **5-question wizard**: target, connectivity, topology, bandwidth — auto-generates everything else
+- **Auto-configured features**: 3 Path Quality Profiles (RealTime/Business/Default), 3 Traffic Distribution Profiles (TopDown/BestPath/BestPath+FEC), 3 SD-WAN Policy Rules (VoiceVideo/BusinessApps/Default), Security Zones, VPN Cluster, BGP Routing, Interface Profiles
+- **Panorama output**: Ansible playbooks using `paloaltonetworks.panos.panos_config_element` with per-feature roles and master playbook
+- **SCM output**: Terraform HCL using `paloaltonetworks/scm` provider with zones, profiles, and SD-WAN rules
+- Downloadable ZIP with deployment-ready config and Quick Start guide
 
 ## Quick Start
 
@@ -132,6 +142,15 @@ docker run -d --name panos-sdwan-toolkit -p 8080:8080 -p 9443:9443 ajaymare/pano
 5. Configure HA requirements
 6. Click "Calculate Sizing" for recommendations with rationale
 
+### POC Config Generator
+
+1. Select "POC Config Generator" on the landing page
+2. Choose deployment target: Panorama or SCM
+3. Enter Panorama IP (or SCM folder for SCM target)
+4. Select hub count, branch count, WAN link type, and bandwidth
+5. Review auto-configured features and click "Generate"
+6. Download the ZIP (Ansible playbooks or Terraform HCL)
+
 ## Project Structure
 
 ```
@@ -168,6 +187,10 @@ parser/
 │       ├── ingest.py          # PDF parsing and chunking
 │       ├── store.py           # ChromaDB vector store
 │       └── retrieval.py       # Query and retrieve relevant excerpts
+├── poc/
+│   ├── generator.py           # POC ZIP generation (Ansible + Terraform)
+│   ├── templates.py           # PAN-OS XML element builders
+│   └── html_dashboard.py      # POC results dashboard
 ├── templates/
 │   └── index.html             # Web UI
 └── static/

@@ -25,8 +25,11 @@ from sizing.html_dashboard import generate_sizing_dashboard
 from sizing.excel_report import generate_sizing_report
 from sizing.rag.retrieval import get_docs_for_sizing_result
 from sizing.rag.refresh import auto_refresh_if_stale, refresh_datasheets, get_status as rag_status
-from poc.generator import generate_poc_zip
+from poc.generator import generate_poc_zip, generate_poc_terraform_zip, build_inputs_from_wizard
 from poc.html_dashboard import generate_poc_dashboard
+from advisor.engine import generate_recommendation
+from advisor.html_dashboard import generate_advisor_dashboard
+from advisor.excel_report import generate_advisor_report
 
 app = Flask(__name__)
 app.config['MAX_CONTENT_LENGTH'] = app_config.MAX_CONTENT_LENGTH
@@ -299,11 +302,16 @@ def download(session_id, filename):
     if not os.path.exists(filepath):
         return 'File not found or expired', 404
 
+    if filename.endswith('.zip'):
+        mimetype = 'application/zip'
+    else:
+        mimetype = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+
     return send_file(
         filepath,
         as_attachment=True,
         download_name=filename,
-        mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        mimetype=mimetype,
     )
 
 
@@ -599,8 +607,7 @@ def sizing():
             'branch_private_isps': int(request.form.get('branch_private_isps', 0)),
             'hub_bandwidth_mbps': int(request.form.get('hub_bandwidth_mbps', 1000)),
             'branch_bandwidth_mbps': int(request.form.get('branch_bandwidth_mbps', 100)),
-            'hub_sessions': int(request.form.get('hub_sessions', 500000)),
-            'branch_sessions': int(request.form.get('branch_sessions', 50000)),
+            'topology': request.form.get('topology', 'hub-spoke'),
             'threat_prevention': request.form.get('threat_prevention') == 'yes',
             'ssl_decryption': request.form.get('ssl_decryption') == 'yes',
             'url_filtering': request.form.get('url_filtering') == 'yes',
@@ -646,65 +653,36 @@ def _safe_int(value, default: int) -> int:
 
 @app.route('/generate-poc', methods=['POST'])
 def poc_config():
-    """Generate Ansible playbooks for SD-WAN POC deployment."""
+    """Generate Ansible playbooks or Terraform HCL for SD-WAN POC deployment via wizard."""
     try:
         session_id, session_dir = _make_session_dir()
 
-        # Parse deployment basics
-        template_name = request.form.get('template_name', 'POC-Template').strip() or 'POC-Template'
-        device_group = request.form.get('device_group', 'POC-DeviceGroup').strip() or 'POC-DeviceGroup'
-        panorama_ip = request.form.get('panorama_ip', '').strip()
+        target = request.form.get('target', 'panorama').strip().lower()
 
-        # Parse hub devices from dynamic form rows
-        hub_devices = _parse_device_rows(request.form, 'hub')
-        branch_devices = _parse_device_rows(request.form, 'branch')
-
-        # Parse WAN links from dynamic form rows
-        hub_links = _parse_link_rows(request.form, 'hub')
-        branch_links = _parse_link_rows(request.form, 'branch')
-
-        # Parse security zones
-        zones = _parse_zone_rows(request.form)
-
-        inputs = {
-            'panorama_ip': panorama_ip,
-            'template_name': template_name,
-            'device_group': device_group,
-            'topology_type': request.form.get('topology_type', 'hub-spoke'),
-            'cluster_name': request.form.get('cluster_name', '').strip(),
-            'vpn_address_pool': request.form.get('vpn_address_pool', '').strip(),
-            'hub_devices': hub_devices,
-            'branch_devices': branch_devices,
-            'hub_links': hub_links,
-            'branch_links': branch_links,
-            'zones': zones,
-            'probe_frequency': _safe_int(request.form.get('probe_frequency'), 5),
-            'probe_idle_time': _safe_int(request.form.get('probe_idle_time'), 60),
-            'failback_hold_time': _safe_int(request.form.get('failback_hold_time'), 120),
-            'latency_threshold': _safe_int(request.form.get('latency_threshold'), 100),
-            'latency_sensitivity': request.form.get('latency_sensitivity', 'medium') or 'medium',
-            'jitter_threshold': _safe_int(request.form.get('jitter_threshold'), 50),
-            'jitter_sensitivity': request.form.get('jitter_sensitivity', 'medium') or 'medium',
-            'pkt_loss_threshold': _safe_int(request.form.get('pkt_loss_threshold'), 5),
-            'pkt_loss_sensitivity': request.form.get('pkt_loss_sensitivity', 'medium') or 'medium',
-            'td_method': request.form.get('td_method', 'best-available-path'),
-            'fec_enabled': request.form.get('fec_enabled') == 'yes',
-            'policy_enabled': request.form.get('policy_enabled') == 'yes',
-            'policy_template': request.form.get('policy_template', 'default'),
+        answers = {
+            'panorama_ip': request.form.get('panorama_ip', '').strip(),
+            'hub_count': _safe_int(request.form.get('hub_count'), 1),
+            'branch_count': _safe_int(request.form.get('branch_count'), 2),
+            'wan_type': request.form.get('wan_type', 'internet'),
+            'bandwidth': _safe_int(request.form.get('bandwidth'), 100),
         }
 
-        # Parse custom policy rules if policy is enabled and template is 'custom'
-        if inputs['policy_enabled'] and inputs['policy_template'] == 'custom':
-            inputs['custom_rules'] = _parse_custom_rules(request.form)
+        inputs = build_inputs_from_wizard(answers)
 
-        zip_path, summary = generate_poc_zip(inputs, session_dir)
+        if target == 'scm':
+            scm_folder = request.form.get('scm_folder', '').strip() or 'Remote Networks'
+            inputs['scm_folder'] = scm_folder
+            zip_path, summary = generate_poc_terraform_zip(inputs, session_dir)
+        else:
+            zip_path, summary = generate_poc_zip(inputs, session_dir)
+
         zip_filename = os.path.basename(zip_path)
         dashboard_html = generate_poc_dashboard(inputs, summary)
 
         return jsonify({
             'dashboard_html': dashboard_html,
-            'ansible_url': f'/download-ansible/{session_id}/{zip_filename}',
-            'ansible_filename': zip_filename,
+            'poc_url': f'/download/{session_id}/{zip_filename}',
+            'poc_filename': zip_filename,
             'session_id': session_id,
         })
 
@@ -714,76 +692,38 @@ def poc_config():
         return jsonify({'error': f'Unexpected error: {e}'}), 500
 
 
-def _parse_device_rows(form, role: str) -> list[dict]:
-    """Parse dynamic device rows from form: poc_{role}_serial_0, poc_{role}_name_0, ..."""
-    devices = []
-    i = 0
-    while True:
-        serial = form.get(f'poc_{role}_serial_{i}', '').strip()
-        name = form.get(f'poc_{role}_name_{i}', '').strip()
-        if not serial and not name:
-            break
-        devices.append({
-            'serial': serial or f'{role}-{i+1}',
-            'name': name or f'{role.title()}-{i+1}',
-            'site': form.get(f'poc_{role}_site_{i}', '').strip(),
-            'bgp_as': form.get(f'poc_{role}_as_{i}', '').strip(),
-            'router_id': form.get(f'poc_{role}_rid_{i}', '').strip(),
-            'loopback': form.get(f'poc_{role}_loopback_{i}', '').strip(),
-            'logical_router': form.get(f'poc_{role}_lr_{i}', '').strip() or 'default',
+@app.route('/advisor-recommend', methods=['POST'])
+def advisor_recommend():
+    """Run SD-WAN Advisor recommendation engine."""
+    try:
+        session_id, session_dir = _make_session_dir()
+
+        inputs = {
+            'existing_pa': request.form.get('existing_pa', 'no'),
+            'competitor': request.form.get('competitor', 'none'),
+            'branch_count': request.form.get('branch_count', '11-50'),
+            'hub_count': request.form.get('hub_count', '1'),
+            'security': request.form.get('security', 'full_ngfw'),
+            'management': request.form.get('management', 'no_preference'),
+            'priorities': request.form.getlist('priorities'),
+        }
+
+        result = generate_recommendation(inputs)
+        dashboard_html = generate_advisor_dashboard(result)
+        excel_path = generate_advisor_report(result, output_dir=session_dir)
+        excel_filename = os.path.basename(excel_path)
+
+        return jsonify({
+            'dashboard_html': dashboard_html,
+            'excel_url': f'/download/{session_id}/{excel_filename}',
+            'excel_filename': excel_filename,
+            'session_id': session_id,
         })
-        i += 1
-    return devices
 
-
-def _parse_link_rows(form, role: str) -> list[dict]:
-    """Parse dynamic WAN link rows from form: poc_{role}_link_name_0, ..."""
-    links = []
-    i = 0
-    while True:
-        name = form.get(f'poc_{role}_link_name_{i}', '').strip()
-        if not name:
-            break
-        links.append({
-            'name': name,
-            'type': form.get(f'poc_{role}_link_type_{i}', 'public').strip(),
-            'bandwidth': form.get(f'poc_{role}_link_bw_{i}', '100').strip() or '100',
-            'tag': form.get(f'poc_{role}_link_tag_{i}', '').strip(),
-        })
-        i += 1
-    return links
-
-
-def _parse_custom_rules(form) -> list[dict]:
-    """Parse custom SD-WAN policy rules from form."""
-    rules = []
-    i = 0
-    while True:
-        name = form.get(f'poc_rule_name_{i}', '').strip()
-        if not name:
-            break
-        rules.append({
-            'name': name,
-            'apps': form.get(f'poc_rule_apps_{i}', 'any').strip(),
-        })
-        i += 1
-    return rules
-
-
-def _parse_zone_rows(form) -> list[dict]:
-    """Parse security zone rows from form: poc_zone_name_0, poc_zone_type_0, ..."""
-    zones = []
-    i = 0
-    while True:
-        name = form.get(f'poc_zone_name_{i}', '').strip()
-        if not name:
-            break
-        zones.append({
-            'name': name,
-            'type': form.get(f'poc_zone_type_{i}', 'layer3').strip(),
-        })
-        i += 1
-    return zones
+    except ValueError as e:
+        return jsonify({'error': str(e)}), 400
+    except Exception as e:
+        return jsonify({'error': f'Unexpected error: {e}'}), 500
 
 
 if __name__ == '__main__':
