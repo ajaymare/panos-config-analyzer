@@ -201,10 +201,13 @@ def _render_tunnel_breakdown(tunnel_calc, summary):
     """Render the tunnel calculation breakdown section."""
     tc = tunnel_calc
     bd = tc['breakdown']
+    topology = tc.get('topology', 'hub-spoke')
+    is_full_mesh = topology == 'full-mesh'
+    topology_label = 'Full Mesh' if is_full_mesh else 'Hub & Spoke'
 
-    html = '''
+    html = f'''
     <div class="sizing-tunnel-calc">
-        <h3>IPSec Tunnel Calculation</h3>
+        <h3>IPSec Tunnel Calculation &mdash; {escape(topology_label)}</h3>
         <div class="sizing-tunnel-info">
             <span class="sizing-tunnel-rule">
                 <strong>Private ISP</strong> (MPLS/P2P): 1-to-1 tunnels &mdash; each private link builds one tunnel per matching hub link
@@ -212,6 +215,14 @@ def _render_tunnel_breakdown(tunnel_calc, summary):
             <span class="sizing-tunnel-rule">
                 <strong>Public ISP</strong> (Internet): 1-to-many tunnels &mdash; each public link builds a tunnel to every public link on every hub
             </span>
+    '''
+    if is_full_mesh:
+        html += '''
+            <span class="sizing-tunnel-rule">
+                <strong>Full Mesh</strong>: Branch-to-branch tunnels &mdash; each branch builds tunnels to every other branch via public links
+            </span>
+        '''
+    html += '''
         </div>
         <table class="sizing-tunnel-table">
             <thead>
@@ -241,8 +252,15 @@ def _render_tunnel_breakdown(tunnel_calc, summary):
                     <td colspan="2"><strong>Total per Hub</strong></td>
                     <td class="sizing-calc-result"><strong>{_fmt(tc["tunnels_per_hub"])}</strong></td>
                 </tr>
+    '''
+
+    branch_rows = 3
+    if is_full_mesh and tc.get('branch_to_branch_tunnels', 0) > 0:
+        branch_rows = 4
+
+    html += f'''
                 <tr>
-                    <td rowspan="3"><strong>Per Branch</strong></td>
+                    <td rowspan="{branch_rows}"><strong>Per Branch</strong></td>
                     <td><span class="sizing-isp-badge sizing-isp-private-sm">Private</span></td>
                     <td class="sizing-calc-formula">{escape(bd["branch"]["private"])}</td>
                     <td class="sizing-calc-result">{_fmt(tc["branch_private_tunnels"])}</td>
@@ -252,6 +270,18 @@ def _render_tunnel_breakdown(tunnel_calc, summary):
                     <td class="sizing-calc-formula">{escape(bd["branch"]["public"])}</td>
                     <td class="sizing-calc-result">{_fmt(tc["branch_public_tunnels"])}</td>
                 </tr>
+    '''
+
+    if is_full_mesh and tc.get('branch_to_branch_tunnels', 0) > 0:
+        html += f'''
+                <tr>
+                    <td><span class="sizing-isp-badge" style="background:#6c3483;color:#fff;">Mesh</span></td>
+                    <td class="sizing-calc-formula">{escape(bd["branch"]["mesh"])}</td>
+                    <td class="sizing-calc-result">{_fmt(tc["branch_to_branch_tunnels"])}</td>
+                </tr>
+        '''
+
+    html += f'''
                 <tr class="sizing-tunnel-subtotal">
                     <td colspan="2"><strong>Total per Branch</strong></td>
                     <td class="sizing-calc-result"><strong>{_fmt(tc["tunnels_per_branch"])}</strong></td>
@@ -381,6 +411,9 @@ def generate_sizing_dashboard(result):
     sec_enabled = sum(1 for k in SECURITY_FEATURES if security_features.get(k))
     sec_total = len(SECURITY_FEATURES)
 
+    topology = summary.get('topology', 'hub-spoke')
+    topology_display = 'Full Mesh' if topology == 'full-mesh' else 'Hub & Spoke'
+
     html += f'''
     <div class="sizing-summary-banner">
         <div class="sizing-summary-item">
@@ -390,6 +423,10 @@ def generate_sizing_dashboard(result):
         <div class="sizing-summary-item">
             <span class="sizing-summary-num">{summary["num_branches"]}</span>
             <span class="sizing-summary-label">Branch Sites</span>
+        </div>
+        <div class="sizing-summary-item">
+            <span class="sizing-summary-num sizing-summary-num-sm">{topology_display}</span>
+            <span class="sizing-summary-label">Topology</span>
         </div>
         <div class="sizing-summary-item">
             <span class="sizing-summary-num">{summary["total_devices"]}</span>

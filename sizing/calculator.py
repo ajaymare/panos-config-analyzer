@@ -45,13 +45,19 @@ def _throughput_label(security_features):
 
 
 def calculate_tunnels(num_hubs, hub_public_isps, hub_private_isps,
-                      num_branches, branch_public_isps, branch_private_isps):
-    """Calculate IPSec tunnel counts based on ISP types.
+                      num_branches, branch_public_isps, branch_private_isps,
+                      topology='hub-spoke'):
+    """Calculate IPSec tunnel counts based on ISP types and topology.
 
-    Private links: 1-to-1 mapping -- each branch private link builds
-        one tunnel to each hub's private link (per hub).
-    Public links: 1-to-many -- each branch public link builds a tunnel
-        to every public link on every hub (full mesh).
+    Hub-Spoke topology:
+        Private links: 1-to-1 mapping -- each branch private link builds
+            one tunnel to each hub's private link (per hub).
+        Public links: 1-to-many -- each branch public link builds a tunnel
+            to every public link on every hub.
+
+    Full Mesh topology:
+        Same as hub-spoke PLUS branch-to-branch tunnels -- each branch
+        builds tunnels to every other branch via public links.
 
     Returns dict with per-branch, per-hub, and total tunnel counts + breakdown.
     """
@@ -65,24 +71,43 @@ def calculate_tunnels(num_hubs, hub_public_isps, hub_private_isps,
     hub_public_tunnels = hub_public_isps * branch_public_isps * num_branches
     tunnels_per_hub = hub_private_tunnels + hub_public_tunnels
 
+    # Full mesh: branch-to-branch tunnels via public links
+    branch_to_branch_tunnels = 0
+    if topology == 'full-mesh' and num_branches > 1:
+        # Each branch builds public tunnels to every OTHER branch
+        branch_to_branch_tunnels = branch_public_isps * branch_public_isps * (num_branches - 1)
+        tunnels_per_branch += branch_to_branch_tunnels
+
+    total_tunnels = (tunnels_per_hub * num_hubs) + (tunnels_per_branch * num_branches)
+
+    breakdown = {
+        'hub': {
+            'private': f'{hub_private_isps} hub private x {branch_private_isps} branch private x {num_branches} branches = {hub_private_tunnels}',
+            'public': f'{hub_public_isps} hub public x {branch_public_isps} branch public x {num_branches} branches = {hub_public_tunnels}',
+        },
+        'branch': {
+            'private': f'{branch_private_isps} branch private x {hub_private_isps} hub private x {num_hubs} hubs = {branch_private_tunnels}',
+            'public': f'{branch_public_isps} branch public x {hub_public_isps} hub public x {num_hubs} hubs = {branch_public_tunnels}',
+        },
+    }
+
+    if topology == 'full-mesh' and num_branches > 1:
+        breakdown['branch']['mesh'] = (
+            f'{branch_public_isps} local public x {branch_public_isps} remote public x '
+            f'{num_branches - 1} other branches = {branch_to_branch_tunnels}'
+        )
+
     return {
         'tunnels_per_branch': tunnels_per_branch,
         'branch_private_tunnels': branch_private_tunnels,
         'branch_public_tunnels': branch_public_tunnels,
+        'branch_to_branch_tunnels': branch_to_branch_tunnels,
         'tunnels_per_hub': tunnels_per_hub,
         'hub_private_tunnels': hub_private_tunnels,
         'hub_public_tunnels': hub_public_tunnels,
-        'total_tunnels': (tunnels_per_hub * num_hubs) + (tunnels_per_branch * num_branches),
-        'breakdown': {
-            'hub': {
-                'private': f'{hub_private_isps} hub private x {branch_private_isps} branch private x {num_branches} branches = {hub_private_tunnels}',
-                'public': f'{hub_public_isps} hub public x {branch_public_isps} branch public x {num_branches} branches = {hub_public_tunnels}',
-            },
-            'branch': {
-                'private': f'{branch_private_isps} branch private x {hub_private_isps} hub private x {num_hubs} hubs = {branch_private_tunnels}',
-                'public': f'{branch_public_isps} branch public x {hub_public_isps} hub public x {num_hubs} hubs = {branch_public_tunnels}',
-            },
-        },
+        'total_tunnels': total_tunnels,
+        'topology': topology,
+        'breakdown': breakdown,
     }
 
 
@@ -226,11 +251,15 @@ def calculate_sizing(inputs):
     branch_private_isps = inputs.get('branch_private_isps', 0)
     hub_bandwidth = inputs.get('hub_bandwidth_mbps', 1000)
     branch_bandwidth = inputs.get('branch_bandwidth_mbps', 100)
-    hub_sessions = inputs.get('hub_sessions', 500000)
-    branch_sessions = inputs.get('branch_sessions', 50000)
+    topology = inputs.get('topology', 'hub-spoke')
     hub_ha = inputs.get('hub_ha', False)
     branch_ha_count = inputs.get('branch_ha_count', 0)
     vm_series = inputs.get('vm_series', False)
+
+    # Auto-derive concurrent sessions from throughput
+    # Rule of thumb: ~500 sessions per Mbps of throughput
+    hub_sessions = inputs.get('hub_sessions', hub_bandwidth * 500)
+    branch_sessions = inputs.get('branch_sessions', branch_bandwidth * 500)
 
     # Security features dict
     security_features = {
@@ -249,6 +278,7 @@ def calculate_sizing(inputs):
         num_branches=num_branches,
         branch_public_isps=branch_public_isps,
         branch_private_isps=branch_private_isps,
+        topology=topology,
     )
 
     hub_tunnels = tunnel_calc['tunnels_per_hub']
@@ -412,6 +442,7 @@ def calculate_sizing(inputs):
         'summary': {
             'num_hubs': num_hubs,
             'num_branches': num_branches,
+            'topology': topology,
             'hub_ha': hub_ha,
             'branch_ha_count': branch_ha_count,
             'threat_prevention': security_features['threat_prevention'],
