@@ -1,17 +1,18 @@
 """Excel cell styles and formatting constants."""
 from openpyxl.styles import Font, PatternFill, Alignment, Border, Side, NamedStyle
 
-# Colors
-BLUE = '1A2A44'
-LIGHT_BLUE = 'D6E4F0'
-GREEN = '28A745'
+# Colors — Palo Alto Networks brand palette
+BLUE = '0C1824'          # PANW Deep Navy
+LIGHT_BLUE = 'E8EEF4'
+ORANGE = 'FA582D'        # PANW Flame
+GREEN = '00CC6A'         # PANW Forest Green
 LIGHT_GREEN = 'D4EDDA'
-RED = 'DC3545'
-LIGHT_RED = 'F8D7DA'
-GRAY = 'F2F2F2'
+RED = 'E5484D'
+LIGHT_RED = 'FDEAEA'
+GRAY = 'F5F6F7'
 WHITE = 'FFFFFF'
-DARK_TEXT = '1E2A3A'
-BORDER_COLOR = 'D4DBE6'
+DARK_TEXT = '1A1A1A'     # PANW Charcoal
+BORDER_COLOR = 'E1E4E8'
 
 # Borders
 thin_border = Border(

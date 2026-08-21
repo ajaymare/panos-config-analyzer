@@ -86,6 +86,28 @@ def get_docs_for_sizing_result(sizing_result):
         if docs:
             doc_refs[role_key] = docs
 
+    # Hub options: retrieve docs for each per-series recommendation
+    seen_models = {sizing_result.get('hub', {}).get('model', '')}
+    for i, opt in enumerate(sizing_result.get('hub_options', [])):
+        model_name = opt.get('model', '')
+        if not model_name or model_name in seen_models:
+            continue
+        seen_models.add(model_name)
+        docs = search_and_retrieve(model_name, n_results=3)
+        if docs:
+            doc_refs[f'hub_option_{i + 1}'] = docs
+
+    # Branch options: retrieve docs for each per-series recommendation
+    seen_models.add(sizing_result.get('branch', {}).get('model', ''))
+    for i, opt in enumerate(sizing_result.get('branch_options', [])):
+        model_name = opt.get('model', '')
+        if not model_name or model_name in seen_models:
+            continue
+        seen_models.add(model_name)
+        docs = search_and_retrieve(model_name, n_results=3)
+        if docs:
+            doc_refs[f'branch_option_{i + 1}'] = docs
+
     return doc_refs
 
 

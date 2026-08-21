@@ -59,7 +59,7 @@ def refresh_datasheets():
     }
 
 
-def auto_refresh_if_stale(max_age_days=30):
+def auto_refresh_if_stale(max_age_days=7):
     """Refresh datasheets only if the last refresh was more than max_age_days ago.
     Returns True if a refresh was triggered."""
     meta = _load_metadata()

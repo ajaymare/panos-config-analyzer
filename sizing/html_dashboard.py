@@ -50,11 +50,12 @@ def _render_model_card(role, result, security_features):
     isps = result.get('isps', {})
     platform = result.get('platform', 'hardware')
 
-    role_color = '#fa582d' if role == 'Hub' else '#2e86c1'
+    is_hub = role.startswith('Hub')
+    role_color = '#fa582d' if is_hub else '#2e86c1'
     if platform == 'virtual':
-        role_icon = '&#9729;' if role == 'Hub' else '&#9729;'  # cloud icon
+        role_icon = '&#9729;'  # cloud icon
     else:
-        role_icon = '&#127981;' if role == 'Hub' else '&#127970;'
+        role_icon = '&#127981;' if is_hub else '&#127970;'
 
     platform_badge = ''
     if platform == 'virtual':
@@ -138,23 +139,64 @@ def _render_model_card(role, result, security_features):
                 </div>
         '''
 
+    # SD-WAN specific specs
+    html += '''
+            </div>
+            <div class="sizing-sdwan-section">
+                <h4>SD-WAN Capabilities</h4>
+                <div class="sizing-specs-grid">
+    '''
+
+    sdwan_items = [
+        ('SD-WAN Policy Rules', specs.get('sdwan_rules', 'N/A')),
+        ('SD-WAN Virtual Interfaces', specs.get('sdwan_virtual_interfaces', 'N/A')),
+        ('Max Security Zones', specs.get('max_zones', 'N/A')),
+        ('Max Virtual Routers', specs.get('max_virtual_routers', 'N/A')),
+    ]
+
+    for label, val in sdwan_items:
+        html += f'''
+                <div class="sizing-spec-item">
+                    <div class="sizing-spec-label">{label}</div>
+                    <div class="sizing-spec-value">{_fmt(val) if isinstance(val, int) else val}</div>
+                </div>
+        '''
+
+    use_case = specs.get('use_case', '')
+    if use_case:
+        html += f'''
+                <div class="sizing-spec-item" style="grid-column: 1 / -1;">
+                    <div class="sizing-spec-label">Ideal Use Case</div>
+                    <div class="sizing-spec-value" style="color: #2e86c1; font-weight: 600;">{escape(use_case)}</div>
+                </div>
+        '''
+
+    html += '''
+                </div>
+            </div>
+    '''
+
     # Physical specs
     html += f'''
-                <div class="sizing-spec-item">
-                    <div class="sizing-spec-label">Form Factor</div>
-                    <div class="sizing-spec-value">{escape(specs.get("form_factor", ""))}</div>
-                </div>
-                <div class="sizing-spec-item">
-                    <div class="sizing-spec-label">Network Ports</div>
-                    <div class="sizing-spec-value">{escape(specs.get("ports", ""))}</div>
-                </div>
-                <div class="sizing-spec-item">
-                    <div class="sizing-spec-label">Power Supply</div>
-                    <div class="sizing-spec-value">{escape(specs.get("power_supply", ""))}</div>
-                </div>
-                <div class="sizing-spec-item">
-                    <div class="sizing-spec-label">HA Supported</div>
-                    <div class="sizing-spec-value">{"Yes" if specs.get("ha_supported") else "No"}</div>
+            <div class="sizing-physical-section">
+                <h4>Physical Specifications</h4>
+                <div class="sizing-specs-grid">
+                    <div class="sizing-spec-item">
+                        <div class="sizing-spec-label">Form Factor</div>
+                        <div class="sizing-spec-value">{escape(specs.get("form_factor", ""))}</div>
+                    </div>
+                    <div class="sizing-spec-item">
+                        <div class="sizing-spec-label">Network Ports</div>
+                        <div class="sizing-spec-value">{escape(specs.get("ports", ""))}</div>
+                    </div>
+                    <div class="sizing-spec-item">
+                        <div class="sizing-spec-label">Power Supply</div>
+                        <div class="sizing-spec-value">{escape(specs.get("power_supply", ""))}</div>
+                    </div>
+                    <div class="sizing-spec-item">
+                        <div class="sizing-spec-label">HA Supported</div>
+                        <div class="sizing-spec-value">{"Yes" if specs.get("ha_supported") else "No"}</div>
+                    </div>
                 </div>
             </div>
     '''
@@ -326,7 +368,7 @@ def _render_security_features(security_features):
     return html
 
 
-def _render_doc_references(doc_refs):
+def _render_doc_references(doc_refs, sizing_result=None):
     """Render the Official Documentation panel with datasheet excerpts."""
     if not doc_refs:
         return ''
@@ -337,10 +379,29 @@ def _render_doc_references(doc_refs):
         <p class="sizing-doc-refs-desc">Relevant excerpts from Palo Alto Networks datasheets, auto-retrieved for recommended models.</p>
     '''
 
+    # Build role labels with actual model names
     role_labels = {'hub': 'Hub', 'branch': 'Branch', 'hub_virtual': 'Hub (VM-Series)'}
+    if sizing_result:
+        for key in ('hub', 'branch', 'hub_virtual'):
+            data = sizing_result.get(key)
+            if data:
+                model = data.get('model', '')
+                series = data.get('specs', {}).get('series', '')
+                base = role_labels.get(key, key.title())
+                role_labels[key] = f'{base} — {model} ({series})' if series else f'{base} — {model}'
+        for i, opt in enumerate(sizing_result.get('hub_options', [])):
+            rk = f'hub_option_{i + 1}'
+            model = opt.get('model', '')
+            series = opt.get('series', opt.get('specs', {}).get('series', ''))
+            role_labels[rk] = f'Hub Option {i + 1} — {model} ({series})'
+        for i, opt in enumerate(sizing_result.get('branch_options', [])):
+            rk = f'branch_option_{i + 1}'
+            model = opt.get('model', '')
+            series = opt.get('series', opt.get('specs', {}).get('series', ''))
+            role_labels[rk] = f'Branch Option {i + 1} — {model} ({series})'
 
     for role_key, docs in doc_refs.items():
-        role_label = role_labels.get(role_key, role_key.title())
+        role_label = role_labels.get(role_key, role_key.replace('_', ' ').title())
         html += f'''
         <div class="sizing-doc-role">
             <h4>{escape(role_label)} Model Documentation</h4>
@@ -375,6 +436,157 @@ def _render_doc_references(doc_refs):
         html += '</div>'
 
     html += '</div>'
+    return html
+
+
+def _render_comparison_tool(result, security_features):
+    """Render the device comparison section with add-device capability."""
+    # Collect all recommended model names for the initial comparison table
+    recommended = []
+    hub_options = result.get('hub_options', [])
+    branch_options = result.get('branch_options', [])
+    if len(hub_options) >= 2:
+        for opt in hub_options:
+            recommended.append(opt['model'])
+    else:
+        recommended.append(result['hub']['model'])
+    if result.get('hub_virtual'):
+        recommended.append(result['hub_virtual']['model'])
+    if len(branch_options) >= 2:
+        for opt in branch_options:
+            if opt['model'] not in recommended:
+                recommended.append(opt['model'])
+    else:
+        if result['branch']['model'] not in recommended:
+            recommended.append(result['branch']['model'])
+
+    rec_json = ','.join(f'"{m}"' for m in recommended)
+
+    html = f'''
+    <div class="sizing-compare-section">
+        <div class="sizing-compare-header">
+            <h3>Device Comparison</h3>
+            <div class="sizing-compare-controls">
+                <select id="sizing-compare-select" class="sizing-compare-dropdown">
+                    <option value="">Add a device to compare...</option>
+                </select>
+                <button class="btn-run" onclick="sizingAddCompare()" id="sizing-compare-add-btn">Add to Compare</button>
+            </div>
+        </div>
+        <div class="sizing-compare-table-wrap">
+            <table class="sizing-compare-table" id="sizing-compare-table">
+                <thead id="sizing-compare-thead"></thead>
+                <tbody id="sizing-compare-tbody"></tbody>
+            </table>
+        </div>
+    </div>
+    <script>
+    var sizingAllModels = null;
+    var sizingCompareModels = [{rec_json}];
+    var sizingCompareSpecs = [
+        ['firewall_throughput', 'Firewall Throughput', 'Mbps'],
+        ['threat_throughput', 'Threat Prevention', 'Mbps'],
+        ['ssl_decrypt_throughput', 'SSL Decryption', 'Mbps'],
+        ['ipsec_vpn_throughput', 'IPSec VPN', 'Mbps'],
+        ['max_sessions', 'Max Sessions', ''],
+        ['new_sessions_per_sec', 'New Sessions/Sec', ''],
+        ['max_ipsec_tunnels', 'Max IPSec Tunnels', ''],
+        ['max_security_rules', 'Max Security Rules', ''],
+        ['sdwan_rules', 'SD-WAN Rules', ''],
+        ['sdwan_virtual_interfaces', 'SD-WAN Virtual IFs', ''],
+        ['max_zones', 'Max Zones', ''],
+        ['max_virtual_routers', 'Virtual Routers', ''],
+        ['form_factor', 'Form Factor', ''],
+        ['ports', 'Network Ports', ''],
+        ['power_supply', 'Power Supply', ''],
+        ['use_case', 'Ideal Use Case', ''],
+    ];
+
+    function sizingFmtNum(n) {{
+        if (typeof n !== 'number') return n || '-';
+        if (n >= 1000000) return (n / 1000000).toFixed(1) + 'M';
+        if (n >= 1000) return n.toLocaleString();
+        return n.toString();
+    }}
+
+    function sizingLoadModels() {{
+        if (sizingAllModels) return Promise.resolve();
+        return fetch('/model-specs').then(function(r) {{ return r.json(); }}).then(function(data) {{
+            sizingAllModels = data;
+            var sel = document.getElementById('sizing-compare-select');
+            var names = Object.keys(data).sort();
+            for (var i = 0; i < names.length; i++) {{
+                var o = document.createElement('option');
+                o.value = names[i];
+                o.textContent = names[i] + ' (' + data[names[i]].series + ')';
+                sel.appendChild(o);
+            }}
+        }});
+    }}
+
+    function sizingRenderCompareTable() {{
+        if (!sizingAllModels) return;
+        var thead = document.getElementById('sizing-compare-thead');
+        var tbody = document.getElementById('sizing-compare-tbody');
+        // Header row
+        var hdr = '<tr><th>Specification</th>';
+        for (var i = 0; i < sizingCompareModels.length; i++) {{
+            var m = sizingCompareModels[i];
+            var isRec = i < {len(recommended)};
+            var badge = isRec ? ' <span class="sizing-badge sizing-badge-required">Recommended</span>' : ' <button class="sizing-compare-remove" onclick="sizingRemoveCompare(' + i + ')">&times;</button>';
+            hdr += '<th>' + m + badge + '</th>';
+        }}
+        hdr += '</tr>';
+        thead.innerHTML = hdr;
+        // Body rows
+        var body = '';
+        for (var s = 0; s < sizingCompareSpecs.length; s++) {{
+            var key = sizingCompareSpecs[s][0];
+            var label = sizingCompareSpecs[s][1];
+            var unit = sizingCompareSpecs[s][2];
+            body += '<tr><td class="sizing-compare-label">' + label + '</td>';
+            // Find max value for this spec (for highlighting)
+            var vals = [];
+            for (var i = 0; i < sizingCompareModels.length; i++) {{
+                var specs = sizingAllModels[sizingCompareModels[i]];
+                vals.push(specs ? (specs[key] || 0) : 0);
+            }}
+            var maxVal = typeof vals[0] === 'number' ? Math.max.apply(null, vals) : null;
+            for (var i = 0; i < sizingCompareModels.length; i++) {{
+                var specs = sizingAllModels[sizingCompareModels[i]];
+                var v = specs ? specs[key] : '-';
+                var display = (typeof v === 'number') ? sizingFmtNum(v) + (unit ? ' ' + unit : '') : (v || '-');
+                var cls = (typeof v === 'number' && maxVal && v === maxVal && sizingCompareModels.length > 1) ? ' class="sizing-compare-best"' : '';
+                body += '<td' + cls + '>' + display + '</td>';
+            }}
+            body += '</tr>';
+        }}
+        tbody.innerHTML = body;
+    }}
+
+    function sizingAddCompare() {{
+        var sel = document.getElementById('sizing-compare-select');
+        var model = sel.value;
+        if (!model) return;
+        if (sizingCompareModels.indexOf(model) >= 0) {{
+            sel.value = '';
+            return;
+        }}
+        sizingCompareModels.push(model);
+        sel.value = '';
+        sizingRenderCompareTable();
+    }}
+
+    function sizingRemoveCompare(idx) {{
+        if (idx < {len(recommended)}) return; // can't remove recommended
+        sizingCompareModels.splice(idx, 1);
+        sizingRenderCompareTable();
+    }}
+
+    // Initialize
+    sizingLoadModels().then(function() {{ sizingRenderCompareTable(); }});
+    </script>
+    '''
     return html
 
 
@@ -450,17 +662,36 @@ def generate_sizing_dashboard(result):
     # --- Security Features Summary ---
     html += _render_security_features(security_features)
 
-    # --- Hub and Branch Cards ---
+    # --- Hub Cards ---
     html += '<div class="sizing-cards-row">'
-    html += _render_model_card('Hub', hub, security_features)
+    hub_options = result.get('hub_options', [])
+    if len(hub_options) >= 2:
+        for i, opt in enumerate(hub_options):
+            label = f'Hub Option {i + 1} ({opt["series"]})'
+            html += _render_model_card(label, opt, security_features)
+    else:
+        html += _render_model_card('Hub', hub, security_features)
     if hub_virtual:
-        html += _render_model_card('Hub', hub_virtual, security_features)
-    html += _render_model_card('Branch', branch, security_features)
+        html += _render_model_card('Hub (VM-Series)', hub_virtual, security_features)
     html += '</div>'
+
+    # --- Branch Cards ---
+    html += '<div class="sizing-cards-row">'
+    branch_options = result.get('branch_options', [])
+    if len(branch_options) >= 2:
+        for i, opt in enumerate(branch_options):
+            label = f'Branch Option {i + 1} ({opt["series"]})'
+            html += _render_model_card(label, opt, security_features)
+    else:
+        html += _render_model_card('Branch', branch, security_features)
+    html += '</div>'
+
+    # --- Device Comparison Tool ---
+    html += _render_comparison_tool(result, security_features)
 
     # --- Official Documentation References ---
     if doc_refs:
-        html += _render_doc_references(doc_refs)
+        html += _render_doc_references(doc_refs, sizing_result=result)
 
     # --- Tunnel Calculation Breakdown ---
     html += _render_tunnel_breakdown(tunnel_calc, summary)
@@ -523,7 +754,24 @@ def generate_sizing_dashboard(result):
     hub_ha_label = 'Yes' if summary['hub_ha'] else 'No'
     branch_ha_label = f'{summary["branch_ha_count"]} sites' if summary['branch_ha_count'] > 0 else 'No'
 
-    html += f'''
+    hub_options = result.get('hub_options', [])
+    if len(hub_options) >= 2:
+        for i, opt in enumerate(hub_options):
+            label = f'Hub Option {i + 1}'
+            html += f'''
+                <tr>
+                    <td>{label}</td>
+                    <td><strong>{escape(opt["model"])}</strong></td>
+                    <td>Hardware</td>
+                    <td>{summary["num_hubs"]}</td>
+                    <td>{hub_ha_label}</td>
+                    <td>{opt["device_count"]}</td>
+                    <td>{escape(opt["specs"].get("form_factor", ""))}</td>
+                    <td>{escape(opt["specs"].get("series", ""))}</td>
+                </tr>
+            '''
+    else:
+        html += f'''
                 <tr>
                     <td>Hub</td>
                     <td><strong>{escape(hub["model"])}</strong></td>
@@ -534,7 +782,7 @@ def generate_sizing_dashboard(result):
                     <td>{escape(hub["specs"].get("form_factor", ""))}</td>
                     <td>{escape(hub["specs"].get("series", ""))}</td>
                 </tr>
-    '''
+        '''
     if hub_virtual:
         html += f'''
                 <tr>
@@ -548,7 +796,25 @@ def generate_sizing_dashboard(result):
                     <td>{escape(hub_virtual["specs"].get("series", ""))}</td>
                 </tr>
         '''
-    html += f'''
+
+    branch_options = result.get('branch_options', [])
+    if len(branch_options) >= 2:
+        for i, opt in enumerate(branch_options):
+            label = f'Branch Option {i + 1}'
+            html += f'''
+                <tr>
+                    <td>{label}</td>
+                    <td><strong>{escape(opt["model"])}</strong></td>
+                    <td>Hardware</td>
+                    <td>{summary["num_branches"]}</td>
+                    <td>{branch_ha_label}</td>
+                    <td>{opt["device_count"]}</td>
+                    <td>{escape(opt["specs"].get("form_factor", ""))}</td>
+                    <td>{escape(opt["specs"].get("series", ""))}</td>
+                </tr>
+            '''
+    else:
+        html += f'''
                 <tr>
                     <td>Branch</td>
                     <td><strong>{escape(branch["model"])}</strong></td>
@@ -559,6 +825,9 @@ def generate_sizing_dashboard(result):
                     <td>{escape(branch["specs"].get("form_factor", ""))}</td>
                     <td>{escape(branch["specs"].get("series", ""))}</td>
                 </tr>
+        '''
+
+    html += f'''
                 <tr class="sizing-bom-total">
                     <td colspan="5"><strong>Total Devices</strong></td>
                     <td><strong>{summary["total_devices"]}</strong></td>

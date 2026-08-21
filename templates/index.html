@@ -9,37 +9,105 @@
 <body>
 
 <div class="header">
-    <h1>PAN-OS SD-WAN Toolkit</h1>
+    <h1><span>PAN-OS</span> SD-WAN Toolkit</h1>
     <p>SD-WAN configuration analysis, SCM migration, and firewall sizing recommendations</p>
 </div>
 
 <!-- Landing: choose mode -->
-<div class="container" id="landing-section">
-    <div class="mode-cards">
-        <div class="mode-card" onclick="selectMode('report')">
-            <div class="mode-icon">&#128202;</div>
-            <h3>Generate Report</h3>
-            <p>Parse PAN-OS SD-WAN config and generate an Excel report with deployment scoring, gap analysis, and feature comparison</p>
+<div id="landing-section">
+    <div class="landing-hero">
+        <div class="landing-hero-content">
+            <h2>Enterprise SD-WAN Engineering Tools</h2>
+            <p>A complete suite for Palo Alto Networks SD-WAN — from pre-sales sizing and competitive analysis to deployment automation and post-deployment auditing. Built for SEs, architects, and network engineers.</p>
         </div>
-        <div class="mode-card" onclick="selectMode('scm')">
-            <div class="mode-icon">&#9881;</div>
-            <h3>Generate SCM Config</h3>
-            <p>Convert PAN-OS SD-WAN configuration to Terraform HCL for automated deployment to Strata Cloud Manager</p>
-        </div>
-        <div class="mode-card" onclick="selectMode('sizing')">
-            <div class="mode-icon">&#128290;</div>
-            <h3>Sizing Calculator</h3>
-            <p>Get PA firewall sizing recommendations for SD-WAN deployments based on throughput, tunnels, topology, and security requirements</p>
-        </div>
-        <div class="mode-card" onclick="selectMode('poc')">
-            <div class="mode-icon">&#9889;</div>
-            <h3>POC Config Generator</h3>
-            <p>Generate Ansible playbooks (Panorama) or Terraform HCL (SCM) for SD-WAN POC — profiles, policies, zones, and routing</p>
-        </div>
-        <div class="mode-card" onclick="selectMode('advisor')">
-            <div class="mode-icon">&#128161;</div>
-            <h3>SD-WAN Advisor</h3>
-            <p>PAN-OS SD-WAN vs Prisma SD-WAN — get a data-driven recommendation based on customer requirements, security needs, and competitive landscape</p>
+    </div>
+    <div class="landing-cards-container">
+        <div class="mode-cards">
+            <div class="mode-card" onclick="selectMode('sizing')">
+                <div class="mode-card-icon-bar">
+                    <svg class="mode-svg-icon" viewBox="0 0 48 48" fill="none"><rect x="4" y="34" width="8" height="10" rx="1" fill="#fa582d"/><rect x="15" y="24" width="8" height="20" rx="1" fill="#006dcc"/><rect x="26" y="14" width="8" height="30" rx="1" fill="#00cc6a"/><rect x="37" y="4" width="8" height="40" rx="1" fill="#0c1824"/></svg>
+                </div>
+                <h3>Sizing Calculator</h3>
+                <p class="mode-card-desc">Get firewall sizing recommendations for SD-WAN deployments. Recommends optimal PA hardware models across multiple series with headroom analysis.</p>
+                <div class="mode-card-details">
+                    <div class="mode-card-detail-item"><span class="detail-label">Input</span> Throughput, sessions, ISP links, topology, security features</div>
+                    <div class="mode-card-detail-item"><span class="detail-label">Output</span> Hub + Branch recommendations with multi-series options, tunnel calculations, BOM, and licensing</div>
+                    <div class="mode-card-detail-item"><span class="detail-label">Export</span> Interactive dashboard + downloadable Excel report</div>
+                </div>
+                <div class="mode-card-tags">
+                    <span class="mode-tag">Pre-Sales</span>
+                    <span class="mode-tag">Hardware Selection</span>
+                    <span class="mode-tag">BOM</span>
+                </div>
+            </div>
+            <div class="mode-card" onclick="selectMode('report')">
+                <div class="mode-card-icon-bar">
+                    <svg class="mode-svg-icon" viewBox="0 0 48 48" fill="none"><rect x="6" y="2" width="36" height="44" rx="3" stroke="#0c1824" stroke-width="2.5" fill="none"/><line x1="14" y1="12" x2="34" y2="12" stroke="#fa582d" stroke-width="2.5" stroke-linecap="round"/><line x1="14" y1="20" x2="30" y2="20" stroke="#006dcc" stroke-width="2" stroke-linecap="round"/><line x1="14" y1="28" x2="26" y2="28" stroke="#006dcc" stroke-width="2" stroke-linecap="round"/><line x1="14" y1="36" x2="22" y2="36" stroke="#00cc6a" stroke-width="2" stroke-linecap="round"/></svg>
+                </div>
+                <h3>Configuration Report</h3>
+                <p class="mode-card-desc">Upload PAN-OS XML configs to get a full SD-WAN deployment audit — 38 features scored across 7 categories with gap analysis and recommendations.</p>
+                <div class="mode-card-details">
+                    <div class="mode-card-detail-item"><span class="detail-label">Input</span> Panorama or NGFW XML config export (single or multiple)</div>
+                    <div class="mode-card-detail-item"><span class="detail-label">Output</span> Deployment maturity score (Basic/Advanced/Full), feature comparison, gap analysis, and recommendations</div>
+                    <div class="mode-card-detail-item"><span class="detail-label">Export</span> Interactive dashboard + Excel report with executive summary</div>
+                </div>
+                <div class="mode-card-tags">
+                    <span class="mode-tag">Post-Deploy</span>
+                    <span class="mode-tag">Audit</span>
+                    <span class="mode-tag">Gap Analysis</span>
+                </div>
+            </div>
+            <div class="mode-card" onclick="selectMode('scm')">
+                <div class="mode-card-icon-bar">
+                    <svg class="mode-svg-icon" viewBox="0 0 48 48" fill="none"><path d="M24 6 L42 16 L42 32 L24 42 L6 32 L6 16 Z" stroke="#006dcc" stroke-width="2.5" fill="none"/><path d="M24 6 L24 42" stroke="#006dcc" stroke-width="1.5"/><path d="M6 16 L42 16" stroke="#006dcc" stroke-width="1.5"/><path d="M6 32 L42 32" stroke="#006dcc" stroke-width="1.5"/><circle cx="24" cy="24" r="5" fill="#fa582d"/></svg>
+                </div>
+                <h3>SCM Migration</h3>
+                <p class="mode-card-desc">Convert PAN-OS SD-WAN config to Terraform HCL for Strata Cloud Manager. Auto-generates resource blocks for 15 SD-WAN object types.</p>
+                <div class="mode-card-details">
+                    <div class="mode-card-detail-item"><span class="detail-label">Input</span> Panorama or NGFW XML config with optional SCM credentials</div>
+                    <div class="mode-card-detail-item"><span class="detail-label">Output</span> Terraform project (provider, variables, per-feature .tf files) targeting paloaltonetworks/scm provider</div>
+                    <div class="mode-card-detail-item"><span class="detail-label">Deploy</span> Run terraform init/plan/apply directly from the browser</div>
+                </div>
+                <div class="mode-card-tags">
+                    <span class="mode-tag">Migration</span>
+                    <span class="mode-tag">Terraform</span>
+                    <span class="mode-tag">IaC</span>
+                </div>
+            </div>
+            <div class="mode-card" onclick="selectMode('poc')">
+                <div class="mode-card-icon-bar">
+                    <svg class="mode-svg-icon" viewBox="0 0 48 48" fill="none"><circle cx="24" cy="14" r="8" stroke="#0c1824" stroke-width="2.5" fill="none"/><circle cx="12" cy="36" r="6" stroke="#fa582d" stroke-width="2" fill="none"/><circle cx="36" cy="36" r="6" stroke="#00cc6a" stroke-width="2" fill="none"/><line x1="24" y1="22" x2="12" y2="30" stroke="#006dcc" stroke-width="2"/><line x1="24" y1="22" x2="36" y2="30" stroke="#006dcc" stroke-width="2"/></svg>
+                </div>
+                <h3>POC Config Generator</h3>
+                <p class="mode-card-desc">Generate ready-to-deploy SD-WAN POC configs via a guided wizard. Outputs Ansible playbooks for Panorama or Terraform HCL for SCM.</p>
+                <div class="mode-card-details">
+                    <div class="mode-card-detail-item"><span class="detail-label">Input</span> 6-step wizard: target platform, topology (hubs/branches), WAN links, bandwidth</div>
+                    <div class="mode-card-detail-item"><span class="detail-label">Output</span> Complete SD-WAN config: zones, BGP routing, path quality profiles, traffic distribution, SD-WAN policies, VPN clusters, interface profiles</div>
+                    <div class="mode-card-detail-item"><span class="detail-label">Deploy</span> Download Ansible ZIP or Terraform ZIP — run directly against Panorama or SCM</div>
+                </div>
+                <div class="mode-card-tags">
+                    <span class="mode-tag">POC</span>
+                    <span class="mode-tag">Ansible</span>
+                    <span class="mode-tag">Automation</span>
+                </div>
+            </div>
+            <div class="mode-card" onclick="selectMode('advisor')">
+                <div class="mode-card-icon-bar">
+                    <svg class="mode-svg-icon" viewBox="0 0 48 48" fill="none"><circle cx="24" cy="24" r="18" stroke="#0c1824" stroke-width="2.5" fill="none"/><path d="M24 10 L28 22 L24 24" stroke="#fa582d" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M24 24 L34 30" stroke="#006dcc" stroke-width="2" stroke-linecap="round"/><circle cx="24" cy="24" r="2.5" fill="#0c1824"/></svg>
+                </div>
+                <h3>SD-WAN Advisor</h3>
+                <p class="mode-card-desc">PAN-OS SD-WAN vs Prisma SD-WAN — get a data-driven recommendation based on customer profile, security needs, and competitive landscape.</p>
+                <div class="mode-card-details">
+                    <div class="mode-card-detail-item"><span class="detail-label">Input</span> 7-step wizard: existing PA investment, competitor, scale, security model, management preference, priorities</div>
+                    <div class="mode-card-detail-item"><span class="detail-label">Output</span> Weighted scoring across 6 categories, feature comparison, competitive displacement talking points</div>
+                    <div class="mode-card-detail-item"><span class="detail-label">Export</span> Interactive dashboard + downloadable Excel report for customer presentation</div>
+                </div>
+                <div class="mode-card-tags">
+                    <span class="mode-tag">Pre-Sales</span>
+                    <span class="mode-tag">Competitive</span>
+                    <span class="mode-tag">Advisory</span>
+                </div>
+            </div>
         </div>
     </div>
 </div>
@@ -1430,7 +1498,15 @@ function refreshDatasheets() {
 function showSizingDashboard(html, excelUrl) {
     document.getElementById('sizing-form-section').style.display = 'none';
     document.getElementById('main-footer').style.display = 'none';
-    document.getElementById('sizing-dashboard-content').innerHTML = html;
+    var container = document.getElementById('sizing-dashboard-content');
+    container.innerHTML = html;
+    // Re-execute script tags (innerHTML doesn't run them)
+    var scripts = container.querySelectorAll('script');
+    scripts.forEach(function(oldScript) {
+        var newScript = document.createElement('script');
+        newScript.textContent = oldScript.textContent;
+        oldScript.parentNode.replaceChild(newScript, oldScript);
+    });
     document.getElementById('sizing-excel-btn').href = excelUrl;
     document.getElementById('sizing-results-section').style.display = '';
     window.scrollTo(0, 0);

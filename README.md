@@ -1,8 +1,8 @@
 # PAN-OS SD-WAN Toolkit
 
-Docker-based web application for Palo Alto Networks SD-WAN professionals. Four integrated tools: Configuration Analysis with deployment scoring, SCM Migration with Terraform HCL generation, Firewall Sizing Calculator with hardware and VM-Series recommendations, and POC Config Generator with Ansible/Terraform output.
+Docker-based web application for Palo Alto Networks SD-WAN professionals. Five integrated tools: Configuration Analysis with deployment scoring, SCM Migration with Terraform HCL generation, Firewall Sizing Calculator with hardware and VM-Series recommendations, POC Config Generator with Ansible/Terraform output, and SD-WAN Advisor for competitive positioning.
 
-## Four Modes
+## Five Modes
 
 ### 1. Configuration Analysis
 Upload Panorama or NGFW XML configs to generate deployment reports with maturity scoring, gap analysis, and multi-config comparison.
@@ -27,10 +27,12 @@ Convert PAN-OS SD-WAN configurations to Terraform HCL targeting the `paloaltonet
 ### 3. Sizing Calculator
 Input site requirements and get PA firewall model recommendations for SD-WAN deployments.
 
-- **Hardware**: 17 PA models (PA-440 through PA-7080)
+- **Hardware**: 21 PA models across 7 series (PA-400 through PA-7000)
 - **VM-Series**: 7 VM models (VM-50 through VM-1000-HV)
 - **Security features** that affect sizing: Threat Prevention, SSL Decryption, URL Filtering, WildFire, DNS Security
-- Separate Hub and Branch recommendations with role-aware model selection
+- Separate Hub and Branch recommendations with up to 2 alternative options per role from different series
+- **SD-WAN-specific specs**: Policy rules, virtual interfaces, security zones, virtual routers per model
+- **Device Comparison Tool**: Side-by-side comparison of recommended models with ability to add any PA/VM model from the full catalog, with best-value highlighting
 - ISP-based tunnel calculation (Private: 1-to-1, Public: 1-to-many)
 - 30% minimum headroom enforcement on all sizing requirements
 - TAC recommended PAN-OS version per model series
@@ -48,6 +50,17 @@ Step-by-step wizard to generate SD-WAN proof-of-concept deployment packages with
 - **Panorama output**: Ansible playbooks using `paloaltonetworks.panos.panos_config_element` with per-feature roles and master playbook
 - **SCM output**: Terraform HCL using `paloaltonetworks/scm` provider with zones, profiles, and SD-WAN rules
 - Downloadable ZIP with deployment-ready config and Quick Start guide
+
+### 5. SD-WAN Advisor
+Guided wizard for sales teams to generate competitive positioning recommendations — PAN-OS SD-WAN vs Prisma SD-WAN.
+
+- **7-step wizard**: existing PA investment, competitor displacement, deployment scale, security model, management preference, key priorities, review & generate
+- **Weighted scoring engine**: 6 categories (Existing Investment, Security Model, Management, Deployment Scale, Competitive Fit, Priority Alignment) with configurable weights
+- Recommendation with confidence score and per-category rationale
+- Side-by-side PAN-OS vs Prisma score bars
+- Feature comparison table (10 rows)
+- Competitive displacement talking points (Fortinet, Cisco Viptela, Cisco Meraki, VeloCloud, Silver Peak)
+- Downloadable Excel report with Executive Summary, Scoring Breakdown, Feature Comparison, and Next Steps
 
 ## Quick Start
 
@@ -78,11 +91,12 @@ docker run -d --name panos-sdwan-toolkit -p 8080:8080 -p 9443:9443 ajaymare/pano
 
 ## Sizing Calculator Details
 
-### Supported PA Hardware Models
+### Supported PA Hardware Models (21 Models)
 
 | Series | Models | Role |
 |--------|--------|------|
-| PA-400 | PA-440, PA-450, PA-460 | Branch |
+| PA-400 | PA-410, PA-440, PA-450, PA-460 | Branch |
+| PA-500 | PA-540, PA-560 | Branch |
 | PA-800 | PA-820, PA-850 | Branch |
 | PA-1400 | PA-1410, PA-1420 | Branch / Hub |
 | PA-3400 | PA-3410, PA-3420, PA-3430, PA-3440 | Hub |
@@ -100,6 +114,14 @@ docker run -d --name panos-sdwan-toolkit -p 8080:8080 -p 9443:9443 ajaymare/pano
 | VM-500 | 8 | Branch / Hub |
 | VM-700 | 16 | Hub |
 | VM-1000-HV | 16+ | Hub |
+
+### SD-WAN Specific Device Capabilities
+
+Each model includes SD-WAN-specific specs used for sizing decisions:
+- **SD-WAN Policy Rules**: Max number of SD-WAN rules supported
+- **SD-WAN Virtual Interfaces**: Max virtual interfaces for SD-WAN tunnels
+- **Max Security Zones**: Zone capacity for segmentation
+- **Max Virtual Routers**: VR capacity for multi-VRF deployments
 
 ### Security Features and Throughput Impact
 
@@ -136,11 +158,11 @@ docker run -d --name panos-sdwan-toolkit -p 8080:8080 -p 9443:9443 ajaymare/pano
 ### Sizing Calculator
 
 1. Select "Sizing Calculator" on the landing page
-2. Choose platform (Hardware or VM-Series)
-3. Enter deployment details: hub/branch count, bandwidth, sessions, ISP links
-4. Toggle security features (Threat Prevention, SSL Decryption, etc.)
-5. Configure HA requirements
-6. Click "Calculate Sizing" for recommendations with rationale
+2. Enter deployment details: hub/branch count, bandwidth, sessions, ISP links
+3. Toggle security features (Threat Prevention, SSL Decryption, etc.)
+4. Configure HA requirements
+5. Click "Calculate Sizing" for recommendations with rationale
+6. Use the Device Comparison tool to compare recommended models against any other PA/VM model
 
 ### POC Config Generator
 
@@ -151,10 +173,17 @@ docker run -d --name panos-sdwan-toolkit -p 8080:8080 -p 9443:9443 ajaymare/pano
 5. Review auto-configured features and click "Generate"
 6. Download the ZIP (Ansible playbooks or Terraform HCL)
 
+### SD-WAN Advisor
+
+1. Select "SD-WAN Advisor" on the landing page
+2. Answer questions about existing PA investment, competitor, scale, security, management, and priorities
+3. Review the recommendation with confidence score and per-category breakdown
+4. Download the Excel report for stakeholder distribution
+
 ## Project Structure
 
 ```
-parser/
+panos-sdwan-toolkit/
 ├── app.py                     # Flask routes
 ├── config.py                  # App configuration
 ├── Dockerfile
@@ -177,9 +206,9 @@ parser/
 │   ├── terraform_generator.py # Terraform HCL generation (paloaltonetworks/scm provider)
 │   └── migration_report.py    # Migration report generation
 ├── sizing/
-│   ├── models.py              # PA + VM-Series specs, licensing data
-│   ├── calculator.py          # Sizing algorithm
-│   ├── html_dashboard.py      # Sizing dashboard HTML
+│   ├── models.py              # PA + VM-Series specs (21 PA + 7 VM), licensing data
+│   ├── calculator.py          # Sizing algorithm with series-based options
+│   ├── html_dashboard.py      # Sizing dashboard HTML + device comparison tool
 │   ├── excel_report.py        # Sizing Excel report
 │   └── rag/                   # Datasheet RAG pipeline
 │       ├── sources.py         # PA datasheet URL registry
@@ -191,8 +220,12 @@ parser/
 │   ├── generator.py           # POC ZIP generation (Ansible + Terraform)
 │   ├── templates.py           # PAN-OS XML element builders
 │   └── html_dashboard.py      # POC results dashboard
+├── advisor/
+│   ├── engine.py              # Scoring algorithm, competitive data, feature comparison
+│   ├── html_dashboard.py      # Advisor results dashboard
+│   └── excel_report.py        # Advisor Excel report
 ├── templates/
-│   └── index.html             # Web UI
+│   └── index.html             # Web UI (landing page + 5 mode wizards)
 └── static/
     └── style.css
 ```

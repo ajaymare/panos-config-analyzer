@@ -215,6 +215,89 @@ def _find_best_model(required_throughput, concurrent_sessions, num_tunnels,
     return pick[0], pick[1], rationale, alternative
 
 
+# Series in preference order for each role
+_BRANCH_SERIES = ['PA-400', 'PA-500', 'PA-800', 'PA-1400']
+_HUB_SERIES = ['PA-1400', 'PA-3400', 'PA-5400', 'PA-7000']
+
+# Maximum number of alternative options to show per role
+_MAX_OPTIONS = 2
+
+
+def _find_series_options(required_throughput, concurrent_sessions, num_tunnels,
+                         security_features, series_list, headroom_pct=30,
+                         max_options=_MAX_OPTIONS):
+    """Find the best model from each hardware series that meets requirements.
+
+    Returns up to max_options dicts, one per qualifying series:
+        [{'model': str, 'specs': dict, 'rationale': list, 'alternative': dict|None, 'series': str}, ...]
+    """
+    headroom_factor = 1 + (headroom_pct / 100)
+    throughput_key = _get_throughput_key(security_features)
+
+    sized_throughput = int(required_throughput * headroom_factor)
+    sized_sessions = int(concurrent_sessions * headroom_factor)
+    sized_tunnels = int(num_tunnels * headroom_factor)
+
+    options = []
+    for series in series_list:
+        # Collect models in this series
+        series_models = [(name, specs) for name, specs in PA_MODELS.items()
+                         if specs['series'] == series]
+        if not series_models:
+            continue
+
+        # Find smallest model in this series that meets all requirements
+        best = None
+        for model_name, specs in series_models:
+            if (specs[throughput_key] >= sized_throughput and
+                    specs['max_sessions'] >= sized_sessions and
+                    specs['max_ipsec_tunnels'] >= sized_tunnels):
+                best = (model_name, specs)
+                break  # models are ordered smallest-first
+
+        if not best:
+            continue
+
+        model_name, specs = best
+        tp_label = _throughput_label(security_features)
+        rationale = [
+            f'Required throughput: {_format_number(required_throughput)} Mbps (using {tp_label} throughput)',
+            f'Required concurrent sessions: {_format_number(concurrent_sessions)}',
+            f'Required IPSec tunnels: {_format_number(num_tunnels)}',
+            f'Minimum headroom: {headroom_pct}%',
+            f'Series: {series}',
+            f'Selected {model_name} -- smallest {series} model meeting all requirements',
+        ]
+
+        tp_headroom = ((specs[throughput_key] - required_throughput) / required_throughput * 100)
+        sess_headroom = ((specs['max_sessions'] - concurrent_sessions) / concurrent_sessions * 100)
+        tun_headroom = ((specs['max_ipsec_tunnels'] - num_tunnels) / num_tunnels * 100) if num_tunnels > 0 else 100
+        rationale.append(
+            f'Headroom -- Throughput: {tp_headroom:.0f}%, '
+            f'Sessions: {sess_headroom:.0f}%, Tunnels: {tun_headroom:.0f}%'
+        )
+
+        # Find alternative within same series
+        alt = None
+        idx = series_models.index((model_name, specs))
+        if idx + 1 < len(series_models):
+            alt_name, alt_specs = series_models[idx + 1]
+            alt = {'model': alt_name, 'specs': alt_specs}
+
+        options.append({
+            'model': model_name,
+            'specs': specs,
+            'rationale': rationale,
+            'alternative': alt,
+            'series': series,
+        })
+
+        if len(options) >= max_options:
+            break
+
+    return options
+
+
 def calculate_sizing(inputs):
     """Run the sizing calculator.
 
@@ -331,6 +414,24 @@ def calculate_sizing(inputs):
         role='branch',
         security_features=security_features,
         platform='hardware',
+    )
+
+    # --- Hub options from multiple series ---
+    hub_options = _find_series_options(
+        required_throughput=hub_bandwidth,
+        concurrent_sessions=hub_sessions,
+        num_tunnels=hub_tunnels,
+        security_features=security_features,
+        series_list=_HUB_SERIES,
+    )
+
+    # --- Branch options from multiple series ---
+    branch_options = _find_series_options(
+        required_throughput=branch_bandwidth,
+        concurrent_sessions=branch_sessions,
+        num_tunnels=branch_tunnels,
+        security_features=security_features,
+        series_list=_BRANCH_SERIES,
     )
 
     # --- Licensing ---
@@ -461,5 +562,37 @@ def calculate_sizing(inputs):
     if hub_vm_result:
         hub_vm_result['device_count'] = hub_devices
         result['hub_virtual'] = hub_vm_result
+
+    # Enrich hub options with shared fields
+    for opt in hub_options:
+        opt['device_count'] = hub_devices
+        opt['platform'] = 'hardware'
+        opt['inputs'] = {
+            'bandwidth_mbps': hub_bandwidth,
+            'tunnels': hub_tunnels,
+            'sessions': hub_sessions,
+        }
+        opt['isps'] = {
+            'public': hub_public_isps,
+            'private': hub_private_isps,
+            'total': hub_public_isps + hub_private_isps,
+        }
+    result['hub_options'] = hub_options
+
+    # Enrich branch options with shared fields
+    for opt in branch_options:
+        opt['device_count'] = branch_devices
+        opt['platform'] = 'hardware'
+        opt['inputs'] = {
+            'bandwidth_mbps': branch_bandwidth,
+            'tunnels': branch_tunnels,
+            'sessions': branch_sessions,
+        }
+        opt['isps'] = {
+            'public': branch_public_isps,
+            'private': branch_private_isps,
+            'total': branch_public_isps + branch_private_isps,
+        }
+    result['branch_options'] = branch_options
 
     return result

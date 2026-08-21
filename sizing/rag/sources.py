@@ -16,6 +16,7 @@ PDF_DIR = os.path.join(RAG_DATA_DIR, 'pdfs')
 # Update this dict when new series are released.
 DATASHEET_URLS = {
     'PA-400 Series': 'https://www.paloaltonetworks.com/resources/datasheets/pa-400-series',
+    'PA-500 Series': 'https://www.paloaltonetworks.com/resources/datasheets/pa-400-series',
     'PA-800 Series': 'https://www.paloaltonetworks.com/resources/datasheets/pa-800-series-specsheet',
     'PA-1400 Series': 'https://www.paloaltonetworks.com/resources/datasheets/pa-1400-series',
     'PA-3400 Series': 'https://www.paloaltonetworks.com/resources/datasheets/pa-3400-series',
@@ -23,6 +24,7 @@ DATASHEET_URLS = {
     'PA-7000 Series': 'https://www.paloaltonetworks.com/resources/datasheets/pa-7000-series',
     'VM-Series': 'https://www.paloaltonetworks.com/resources/datasheets/vm-series-specsheet',
     'SD-WAN': 'https://www.paloaltonetworks.com/resources/datasheets/sd-wan',
+    'Product Selection': 'https://www.paloaltonetworks.com/products/product-selection',
 }
 
 

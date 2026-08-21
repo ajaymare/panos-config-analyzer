@@ -641,6 +641,18 @@ def sizing():
         return jsonify({'error': f'Unexpected error: {e}'}), 500
 
 
+@app.route('/model-specs')
+def model_specs():
+    """Return specs for all PA models (used for device comparison UI)."""
+    from sizing.models import PA_MODELS, VM_MODELS
+    all_models = {}
+    for name, specs in PA_MODELS.items():
+        all_models[name] = {k: v for k, v in specs.items() if k != 'sdwan_supported'}
+    for name, specs in VM_MODELS.items():
+        all_models[name] = {k: v for k, v in specs.items() if k != 'sdwan_supported'}
+    return jsonify(all_models)
+
+
 def _safe_int(value, default: int) -> int:
     """Convert value to int, returning default if empty or invalid."""
     if not value or not str(value).strip():

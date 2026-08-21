@@ -103,9 +103,18 @@ def generate_sizing_report(result, output_dir):
 
     # KPI Row
     platform_label = 'Hardware + VM-Series' if vm_series else 'Hardware'
-    hub_model_label = f'{hub["model"]}' + (f' / {hub_virtual["model"]}' if hub_virtual else '')
+    hub_options = result.get('hub_options', [])
+    if len(hub_options) >= 2:
+        hub_model_label = ' / '.join(opt['model'] for opt in hub_options)
+    else:
+        hub_model_label = f'{hub["model"]}' + (f' / {hub_virtual["model"]}' if hub_virtual else '')
+    branch_options = result.get('branch_options', [])
+    if len(branch_options) >= 2:
+        branch_model_label = ' / '.join(opt['model'] for opt in branch_options)
+    else:
+        branch_model_label = branch['model']
     style_kpi_cell(ws, row, 1, 'Hub Model', hub_model_label)
-    style_kpi_cell(ws, row, 3, 'Branch Model', branch['model'])
+    style_kpi_cell(ws, row, 3, 'Branch Model', branch_model_label)
     style_kpi_cell(ws, row, 5, 'Total Devices', summary['total_devices'])
     row += 3
 
@@ -135,37 +144,71 @@ def generate_sizing_report(result, output_dir):
         ])
     row = _write_table(ws, row, ['Feature', 'Description', 'Status', 'Performance Impact'], sec_rows)
 
-    # --- Hub Recommendation ---
-    row = _write_section_header(ws, row, 'Hub Recommendation (Hardware)', col_count)
-    hub_specs = [
-        ['Model', hub['model']],
-        ['Series', hub['specs'].get('series', '')],
-        ['Platform', 'Hardware'],
-        ['Description', hub['specs'].get('description', '')],
-        ['Firewall Throughput', f'{_fmt(hub["specs"]["firewall_throughput"])} Mbps'],
-        ['Threat Prevention Throughput', f'{_fmt(hub["specs"]["threat_throughput"])} Mbps'],
-        ['SSL Decryption Throughput', f'{_fmt(hub["specs"].get("ssl_decrypt_throughput", 0))} Mbps'],
-        ['IPSec VPN Throughput', f'{_fmt(hub["specs"]["ipsec_vpn_throughput"])} Mbps'],
-        ['Max Concurrent Sessions', _fmt(hub['specs']['max_sessions'])],
-        ['New Sessions/Second', _fmt(hub['specs']['new_sessions_per_sec'])],
-        ['Max IPSec Tunnels', _fmt(hub['specs']['max_ipsec_tunnels'])],
-        ['Max Security Rules', _fmt(hub['specs']['max_security_rules'])],
-        ['Network Ports', hub['specs'].get('ports', '')],
-        ['Form Factor', hub['specs'].get('form_factor', '')],
-        ['Power Supply', hub['specs'].get('power_supply', '')],
-        ['Device Count', hub['device_count']],
-    ]
-    row = _write_table(ws, row, ['Specification', 'Value'], hub_specs)
+    # --- Hub Recommendation(s) ---
+    hub_options = result.get('hub_options', [])
+    if len(hub_options) >= 2:
+        for idx, opt in enumerate(hub_options):
+            section_title = f'Hub Option {idx + 1} ({opt.get("series", "")})'
+            row = _write_section_header(ws, row, section_title, col_count)
+            opt_specs = [
+                ['Model', opt['model']],
+                ['Series', opt['specs'].get('series', '')],
+                ['Platform', 'Hardware'],
+                ['Description', opt['specs'].get('description', '')],
+                ['Firewall Throughput', f'{_fmt(opt["specs"]["firewall_throughput"])} Mbps'],
+                ['Threat Prevention Throughput', f'{_fmt(opt["specs"]["threat_throughput"])} Mbps'],
+                ['SSL Decryption Throughput', f'{_fmt(opt["specs"].get("ssl_decrypt_throughput", 0))} Mbps'],
+                ['IPSec VPN Throughput', f'{_fmt(opt["specs"]["ipsec_vpn_throughput"])} Mbps'],
+                ['Max Concurrent Sessions', _fmt(opt['specs']['max_sessions'])],
+                ['New Sessions/Second', _fmt(opt['specs']['new_sessions_per_sec'])],
+                ['Max IPSec Tunnels', _fmt(opt['specs']['max_ipsec_tunnels'])],
+                ['Max Security Rules', _fmt(opt['specs']['max_security_rules'])],
+                ['Network Ports', opt['specs'].get('ports', '')],
+                ['Form Factor', opt['specs'].get('form_factor', '')],
+                ['Power Supply', opt['specs'].get('power_supply', '')],
+                ['Device Count', opt['device_count']],
+            ]
+            row = _write_table(ws, row, ['Specification', 'Value'], opt_specs)
 
-    # Hub Rationale
-    row = _write_section_header(ws, row, 'Hub Sizing Rationale', col_count)
-    for i, r in enumerate(hub['rationale']):
-        cell = ws.cell(row=row, column=1, value=f'{i+1}. {r}')
-        cell.font = data_font
-        cell.alignment = data_align
-        ws.merge_cells(start_row=row, start_column=1, end_row=row, end_column=col_count)
+            row = _write_section_header(ws, row, f'Hub Option {idx + 1} Sizing Rationale', col_count)
+            for i, r in enumerate(opt['rationale']):
+                cell = ws.cell(row=row, column=1, value=f'{i+1}. {r}')
+                cell.font = data_font
+                cell.alignment = data_align
+                ws.merge_cells(start_row=row, start_column=1, end_row=row, end_column=col_count)
+                row += 1
+            row += 1
+    else:
+        row = _write_section_header(ws, row, 'Hub Recommendation (Hardware)', col_count)
+        hub_specs = [
+            ['Model', hub['model']],
+            ['Series', hub['specs'].get('series', '')],
+            ['Platform', 'Hardware'],
+            ['Description', hub['specs'].get('description', '')],
+            ['Firewall Throughput', f'{_fmt(hub["specs"]["firewall_throughput"])} Mbps'],
+            ['Threat Prevention Throughput', f'{_fmt(hub["specs"]["threat_throughput"])} Mbps'],
+            ['SSL Decryption Throughput', f'{_fmt(hub["specs"].get("ssl_decrypt_throughput", 0))} Mbps'],
+            ['IPSec VPN Throughput', f'{_fmt(hub["specs"]["ipsec_vpn_throughput"])} Mbps'],
+            ['Max Concurrent Sessions', _fmt(hub['specs']['max_sessions'])],
+            ['New Sessions/Second', _fmt(hub['specs']['new_sessions_per_sec'])],
+            ['Max IPSec Tunnels', _fmt(hub['specs']['max_ipsec_tunnels'])],
+            ['Max Security Rules', _fmt(hub['specs']['max_security_rules'])],
+            ['Network Ports', hub['specs'].get('ports', '')],
+            ['Form Factor', hub['specs'].get('form_factor', '')],
+            ['Power Supply', hub['specs'].get('power_supply', '')],
+            ['Device Count', hub['device_count']],
+        ]
+        row = _write_table(ws, row, ['Specification', 'Value'], hub_specs)
+
+        # Hub Rationale
+        row = _write_section_header(ws, row, 'Hub Sizing Rationale', col_count)
+        for i, r in enumerate(hub['rationale']):
+            cell = ws.cell(row=row, column=1, value=f'{i+1}. {r}')
+            cell.font = data_font
+            cell.alignment = data_align
+            ws.merge_cells(start_row=row, start_column=1, end_row=row, end_column=col_count)
+            row += 1
         row += 1
-    row += 1
 
     # --- Hub VM-Series Recommendation (if enabled) ---
     if hub_virtual:
@@ -197,37 +240,70 @@ def generate_sizing_report(result, output_dir):
             row += 1
         row += 1
 
-    # --- Branch Recommendation ---
-    row = _write_section_header(ws, row, 'Branch Recommendation', col_count)
-    branch_specs = [
-        ['Model', branch['model']],
-        ['Series', branch['specs'].get('series', '')],
-        ['Platform', 'Hardware'],
-        ['Description', branch['specs'].get('description', '')],
-        ['Firewall Throughput', f'{_fmt(branch["specs"]["firewall_throughput"])} Mbps'],
-        ['Threat Prevention Throughput', f'{_fmt(branch["specs"]["threat_throughput"])} Mbps'],
-        ['SSL Decryption Throughput', f'{_fmt(branch["specs"].get("ssl_decrypt_throughput", 0))} Mbps'],
-        ['IPSec VPN Throughput', f'{_fmt(branch["specs"]["ipsec_vpn_throughput"])} Mbps'],
-        ['Max Concurrent Sessions', _fmt(branch['specs']['max_sessions'])],
-        ['New Sessions/Second', _fmt(branch['specs']['new_sessions_per_sec'])],
-        ['Max IPSec Tunnels', _fmt(branch['specs']['max_ipsec_tunnels'])],
-        ['Max Security Rules', _fmt(branch['specs']['max_security_rules'])],
-        ['Network Ports', branch['specs'].get('ports', '')],
-        ['Form Factor', branch['specs'].get('form_factor', '')],
-        ['Power Supply', branch['specs'].get('power_supply', '')],
-        ['Device Count', branch['device_count']],
-    ]
-    row = _write_table(ws, row, ['Specification', 'Value'], branch_specs)
+    # --- Branch Recommendation(s) ---
+    branch_options = result.get('branch_options', [])
+    if len(branch_options) >= 2:
+        for idx, opt in enumerate(branch_options):
+            section_title = f'Branch Option {idx + 1} ({opt.get("series", "")})'
+            row = _write_section_header(ws, row, section_title, col_count)
+            opt_specs = [
+                ['Model', opt['model']],
+                ['Series', opt['specs'].get('series', '')],
+                ['Platform', 'Hardware'],
+                ['Description', opt['specs'].get('description', '')],
+                ['Firewall Throughput', f'{_fmt(opt["specs"]["firewall_throughput"])} Mbps'],
+                ['Threat Prevention Throughput', f'{_fmt(opt["specs"]["threat_throughput"])} Mbps'],
+                ['SSL Decryption Throughput', f'{_fmt(opt["specs"].get("ssl_decrypt_throughput", 0))} Mbps'],
+                ['IPSec VPN Throughput', f'{_fmt(opt["specs"]["ipsec_vpn_throughput"])} Mbps'],
+                ['Max Concurrent Sessions', _fmt(opt['specs']['max_sessions'])],
+                ['New Sessions/Second', _fmt(opt['specs']['new_sessions_per_sec'])],
+                ['Max IPSec Tunnels', _fmt(opt['specs']['max_ipsec_tunnels'])],
+                ['Max Security Rules', _fmt(opt['specs']['max_security_rules'])],
+                ['Network Ports', opt['specs'].get('ports', '')],
+                ['Form Factor', opt['specs'].get('form_factor', '')],
+                ['Power Supply', opt['specs'].get('power_supply', '')],
+                ['Device Count', opt['device_count']],
+            ]
+            row = _write_table(ws, row, ['Specification', 'Value'], opt_specs)
 
-    # Branch Rationale
-    row = _write_section_header(ws, row, 'Branch Sizing Rationale', col_count)
-    for i, r in enumerate(branch['rationale']):
-        cell = ws.cell(row=row, column=1, value=f'{i+1}. {r}')
-        cell.font = data_font
-        cell.alignment = data_align
-        ws.merge_cells(start_row=row, start_column=1, end_row=row, end_column=col_count)
+            row = _write_section_header(ws, row, f'Branch Option {idx + 1} Sizing Rationale', col_count)
+            for i, r in enumerate(opt['rationale']):
+                cell = ws.cell(row=row, column=1, value=f'{i+1}. {r}')
+                cell.font = data_font
+                cell.alignment = data_align
+                ws.merge_cells(start_row=row, start_column=1, end_row=row, end_column=col_count)
+                row += 1
+            row += 1
+    else:
+        row = _write_section_header(ws, row, 'Branch Recommendation', col_count)
+        branch_specs = [
+            ['Model', branch['model']],
+            ['Series', branch['specs'].get('series', '')],
+            ['Platform', 'Hardware'],
+            ['Description', branch['specs'].get('description', '')],
+            ['Firewall Throughput', f'{_fmt(branch["specs"]["firewall_throughput"])} Mbps'],
+            ['Threat Prevention Throughput', f'{_fmt(branch["specs"]["threat_throughput"])} Mbps'],
+            ['SSL Decryption Throughput', f'{_fmt(branch["specs"].get("ssl_decrypt_throughput", 0))} Mbps'],
+            ['IPSec VPN Throughput', f'{_fmt(branch["specs"]["ipsec_vpn_throughput"])} Mbps'],
+            ['Max Concurrent Sessions', _fmt(branch['specs']['max_sessions'])],
+            ['New Sessions/Second', _fmt(branch['specs']['new_sessions_per_sec'])],
+            ['Max IPSec Tunnels', _fmt(branch['specs']['max_ipsec_tunnels'])],
+            ['Max Security Rules', _fmt(branch['specs']['max_security_rules'])],
+            ['Network Ports', branch['specs'].get('ports', '')],
+            ['Form Factor', branch['specs'].get('form_factor', '')],
+            ['Power Supply', branch['specs'].get('power_supply', '')],
+            ['Device Count', branch['device_count']],
+        ]
+        row = _write_table(ws, row, ['Specification', 'Value'], branch_specs)
+
+        row = _write_section_header(ws, row, 'Branch Sizing Rationale', col_count)
+        for i, r in enumerate(branch['rationale']):
+            cell = ws.cell(row=row, column=1, value=f'{i+1}. {r}')
+            cell.font = data_font
+            cell.alignment = data_align
+            ws.merge_cells(start_row=row, start_column=1, end_row=row, end_column=col_count)
+            row += 1
         row += 1
-    row += 1
 
     # --- Tunnel Calculation ---
     tunnel_calc = result.get('tunnel_calc', {})
@@ -275,12 +351,23 @@ def generate_sizing_report(result, output_dir):
     hub_ha_str = 'Yes' if summary.get('hub_ha') else 'No'
     bha = summary.get('branch_ha_count', 0)
     branch_ha_str = f'{bha} sites' if bha > 0 else 'No'
-    bom_rows = [
-        ['Hub', hub['model'], 'Hardware', summary['num_hubs'], hub_ha_str, hub['device_count']],
-    ]
+    hub_options = result.get('hub_options', [])
+    if len(hub_options) >= 2:
+        bom_rows = []
+        for idx, opt in enumerate(hub_options):
+            bom_rows.append([f'Hub Option {idx + 1} ({opt.get("series", "")})', opt['model'], 'Hardware', summary['num_hubs'], hub_ha_str, opt['device_count']])
+    else:
+        bom_rows = [
+            ['Hub', hub['model'], 'Hardware', summary['num_hubs'], hub_ha_str, hub['device_count']],
+        ]
     if hub_virtual:
         bom_rows.append(['Hub (Cloud)', hub_virtual['model'], 'VM-Series', summary['num_hubs'], hub_ha_str, hub_virtual['device_count']])
-    bom_rows.append(['Branch', branch['model'], 'Hardware', summary['num_branches'], branch_ha_str, branch['device_count']])
+    branch_options = result.get('branch_options', [])
+    if len(branch_options) >= 2:
+        for idx, opt in enumerate(branch_options):
+            bom_rows.append([f'Branch Option {idx + 1} ({opt.get("series", "")})', opt['model'], 'Hardware', summary['num_branches'], branch_ha_str, opt['device_count']])
+    else:
+        bom_rows.append(['Branch', branch['model'], 'Hardware', summary['num_branches'], branch_ha_str, branch['device_count']])
     bom_rows.append(['Total', '', '', '', '', summary['total_devices']])
     row = _write_table(ws, row, ['Role', 'Model', 'Platform', 'Sites', 'HA', 'Devices'], bom_rows)
 
